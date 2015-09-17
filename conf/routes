@@ -4,3 +4,5 @@
 
 # Home page
 GET     /                           io.pathfinder.controllers.Application.index
+
+GET     /vehicle/:id                io.pathfinder.controllers.VehicleController.get(id: Long)

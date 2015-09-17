@@ -3,8 +3,8 @@ package io.pathfinder.models
 import com.avaje.ebean.Model
 import javax.persistence.{Id,Entity,GeneratedValue,GenerationType}
 import play.data.validation.Constraints.Required
-import play.api.libs.json.Json._
-import play.api.libs.json.Reads._
+import play.api.libs.json.Json
+import play.api.libs.json.{Reads,Writes}
 import play.api.libs.functional.syntax._
 
 /**
@@ -12,21 +12,31 @@ import play.api.libs.functional.syntax._
  */
 
 object Vehicle extends CrudCompanion[Long,Vehicle]{
-    val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
+    override val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
+    override object writes extends Writes[Vehicle] {
+        override def writes(v: Vehicle) = Json.obj(
+            "id" -> v.id.longValue(),
+            "position" -> Json.obj(
+                "lat" -> v.latitude.doubleValue(),
+                "lng" -> v.longitude.doubleValue()
+            ),
+            "capacity" -> v.capacity.intValue()
+        )
+    }
 }
 
 @Entity
 class Vehicle(
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    val id: Long,
+    var id: java.lang.Long,
 
     @Required
-    var latitude: Double,
+    var latitude: java.lang.Double,
 
     @Required
-    var longitude: Double,
+    var longitude: java.lang.Double,
 
     @Required
-    var capacity: Int
+    var capacity: java.lang.Integer
 ) extends Model
