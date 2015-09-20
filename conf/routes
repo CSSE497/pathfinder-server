@@ -3,6 +3,8 @@
 # ~~~~
 
 # Home page
-GET     /                           io.pathfinder.controllers.Application.index
+GET        /                   io.pathfinder.controllers.Application.index
 
-GET     /vehicle/:id                io.pathfinder.controllers.VehicleController.get(id: Long)
+#GET        /vehicle/:id        io.pathfinder.controllers.VehicleController.get(id: Long)
+
+GET        /commodity          io.pathfinder.controllers.CommodityController.getCommodities()

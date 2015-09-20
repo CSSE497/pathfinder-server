@@ -20,18 +20,18 @@ package controllers {
         }
     }
 
-    abstract class CrudController[K,V <: Model](ccomp: CrudCompanion[K,V]) extends Controller {
-
-        @Transactional
-        def get(id: K) = Action{    // TODO: proper error handling
-            val model = ccomp.finder.byId(id)
-            val json  = Json.toJson(model)(ccomp.writes)
-            Ok(json.toString)
-        }
-    }
-
-    class VehicleController extends CrudController[Long,Vehicle](models.Vehicle){
-        val v = new Vehicle(1,0,0,5)
-        Ebean.save(v)
-    }
+//    abstract class CrudController[K,V <: Model](ccomp: CrudCompanion[K,V]) extends Controller {
+//
+//        @Transactional
+//        def get(id: K) = Action{    // TODO: proper error handling
+//            val model = ccomp.finder.byId(id)
+//            val json  = Json.toJson(model)(ccomp.writes)
+//            Ok(json.toString)
+//        }
+//    }
+//
+//    class VehicleController extends CrudController[Long,Vehicle](models.Vehicle){
+//        val v = new Vehicle(1l,0.0,0.0,5)
+//        Ebean.save(v)
+//    }
 }
