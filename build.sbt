@@ -10,10 +10,10 @@ libraryDependencies ++= Seq(
   jdbc,
   cache,
   ws,
-  specs2 % Test,
-  "org.avaje.ebeanorm" % "avaje-ebeanorm-api" % "3.1.1",
-  "com.google.maps" % "google-maps-services" % "0.1.7"
+  specs2 % Test
 )
+
+testOptions += Tests.Argument(TestFrameworks.JUnit, "-v", "-q", "-a")
 
 resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 

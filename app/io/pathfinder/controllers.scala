@@ -25,13 +25,12 @@ package controllers {
         @Transactional
         def get(id: K) = Action{    // TODO: proper error handling
             val model = ccomp.finder.byId(id)
-            val json  = Json.toJson(model)(ccomp.writes)
+            val json  = Json.toJson(model)(ccomp.format)
             Ok(json.toString)
         }
     }
 
     class VehicleController extends CrudController[Long,Vehicle](models.Vehicle){
-        val v = new Vehicle(1,0,0,5)
-        Ebean.save(v)
+
     }
 }
