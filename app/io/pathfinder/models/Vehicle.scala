@@ -1,8 +1,7 @@
 package io.pathfinder.models
 
 import com.avaje.ebean.Model
-import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Transient}
-import play.data.validation.Constraints.Required
+import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Transient,Column,OneToMany,JoinColumn}
 import play.api.libs.json.{Format,Reads,Json,JsValue}
 import javax.inject.Inject
 
@@ -47,6 +46,8 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
     def unapply(v: Vehicle): Option[(Long, Double, Double, Int)] = Some((v.id, v.latitude, v.longitude, v.capacity))
 }
 
+import scala.collection.mutable.Buffer
+
 @Entity
 class Vehicle() extends Model {
 
@@ -54,12 +55,12 @@ class Vehicle() extends Model {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0
 
-    @Required
+    @Column(nullable=false)
     var latitude: Double = 0
 
-    @Required
+    @Column(nullable=false)
     var longitude: Double = 0
 
-    @Required
+    @Column(nullable=false)
     var capacity: Int = 0
 }
