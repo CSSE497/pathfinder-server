@@ -5,6 +5,8 @@ import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import play.mvc.*;
 import io.pathfinder.models.Commodity;
+
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -47,8 +49,34 @@ public class CommodityController extends Controller {
     return created(jsonContext.toJson(commodity));
   }
 
-  public Result editCommodity() {
-    return null;
+  public Result editCommodity(long id) {
+    Commodity commodity = Commodity.find.byId(id);
+
+    if (commodity == null) {
+      return notFound();
+    }
+
+    JsonNode json = request().body().asJson();
+
+    if (json.hasNonNull("startLatitude")) {
+      commodity.startLatitude = json.findPath("startLatitude").asDouble();
+    }
+    if (json.hasNonNull("startLongitude")) {
+      commodity.startLongitude = json.findPath("startLongitude").asDouble();
+    }
+    if (json.hasNonNull("endLatitude")) {
+      commodity.endLatitude = json.findPath("endLatitude").asDouble();
+    }
+    if (json.hasNonNull("endLongitude")) {
+      commodity.endLongitude = json.findPath("endLongitude").asDouble();
+    }
+    if (json.hasNonNull("param")) {
+      commodity.param = json.findPath("param").asInt();
+    }
+
+    commodity.update();
+
+    return ok();
   }
 
   public Result deleteCommodity(long id) {

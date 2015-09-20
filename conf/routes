@@ -3,11 +3,12 @@
 # ~~~~
 
 # Home page
-GET         /                     io.pathfinder.controllers.Application.index
+GET           /                     io.pathfinder.controllers.Application.index
 
 #GET        /vehicle/:id        io.pathfinder.controllers.VehicleController.get(id: Long)
 
-GET         /commodity            io.pathfinder.controllers.CommodityController.getCommodities()
-GET         /commodity/:id        io.pathfinder.controllers.CommodityController.getCommodity(id: Long)
-POST        /commodity            io.pathfinder.controllers.CommodityController.createCommodity()
-DELETE      /commodity            io.pathfinder.controllers.CommodityController.deleteCommodity(id: Long)
+GET           /commodity            io.pathfinder.controllers.CommodityController.getCommodities()
+GET           /commodity/:id        io.pathfinder.controllers.CommodityController.getCommodity(id: Long)
+POST          /commodity            io.pathfinder.controllers.CommodityController.createCommodity()
+DELETE        /commodity/:id        io.pathfinder.controllers.CommodityController.deleteCommodity(id: Long)
+PUT           /commodity/:id        io.pathfinder.controllers.CommodityController.editCommodity(id: Long)
