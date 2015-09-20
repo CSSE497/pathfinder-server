@@ -3,11 +3,14 @@ package io.pathfinder.controllers;
 import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import play.api.libs.json.JsPath;
 import play.mvc.*;
 import io.pathfinder.models.Commodity;
 
 import java.util.Iterator;
-import java.util.List;
+
+import static play.libs.Json.*;
 
 /**
  * Created by Carter on 9/17/2015.
@@ -36,17 +39,21 @@ public class CommodityController extends Controller {
       return badRequest("Expecting content-type text/json or application/json");
     }
 
-    Commodity commodity = new Commodity();
+    Commodity commodity;
 
-    commodity.startLatitude = json.findPath("startLatitude").asDouble();
-    commodity.startLongitude = json.findPath("startLongitude").asDouble();
-    commodity.endLatitude = json.findPath("endLatitude").asDouble();
-    commodity.endLongitude = json.findPath("endLongitude").asDouble();
-    commodity.param = json.findPath("param").asInt();
+    try {
+      commodity = fromJson(json, Commodity.class);
+    } catch (Exception e) {
+      return badRequest("Unable to map json to commodity object: " + e.getMessage());
+    }
 
-    commodity.save();
+    try {
+      commodity.save();
 
-    return created(jsonContext.toJson(commodity));
+      return created(jsonContext.toJson(commodity));
+    } catch (Exception e) {
+      return internalServerError("Error saving commodity to the database: " + e.getMessage());
+    }
   }
 
   public Result editCommodity(long id) {
@@ -56,27 +63,35 @@ public class CommodityController extends Controller {
       return notFound();
     }
 
-    JsonNode json = request().body().asJson();
+    ObjectNode commodityJson = (ObjectNode) toJson(commodity);
+    ObjectNode body;
 
-    if (json.hasNonNull("startLatitude")) {
-      commodity.startLatitude = json.findPath("startLatitude").asDouble();
-    }
-    if (json.hasNonNull("startLongitude")) {
-      commodity.startLongitude = json.findPath("startLongitude").asDouble();
-    }
-    if (json.hasNonNull("endLatitude")) {
-      commodity.endLatitude = json.findPath("endLatitude").asDouble();
-    }
-    if (json.hasNonNull("endLongitude")) {
-      commodity.endLongitude = json.findPath("endLongitude").asDouble();
-    }
-    if (json.hasNonNull("param")) {
-      commodity.param = json.findPath("param").asInt();
+    try {
+      body = (ObjectNode) request().body().asJson();
+    } catch (ClassCastException e) {
+      return badRequest("Cannot cast request body to ObjectNode: " + e.getMessage());
     }
 
-    commodity.update();
+    Iterator<String> fields = commodityJson.fieldNames();
+    while (fields.hasNext()) {
+      String field = fields.next();
 
-    return ok();
+      if (field.equals("id"))
+        continue;
+
+      if (body.has(field)) {
+        commodityJson.replace(field, body.findPath(field));
+      }
+    }
+
+    try {
+      commodity = fromJson(commodityJson, Commodity.class);
+      commodity.update();
+
+      return ok();
+    } catch (Exception e) {
+      return badRequest("Unable to update commodity: " + e.getMessage());
+    }
   }
 
   public Result deleteCommodity(long id) {
