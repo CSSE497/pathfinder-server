@@ -27,7 +27,7 @@ trait CrudCompanion[K,V <: Model]{
     /**
      * creates a default model
      */
-    def create(): V
+    def create: V
 
     /**
      * A companion for the Update classes declared in subclasses of CrudCompanion

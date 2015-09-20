@@ -1,13 +1,8 @@
 package io.pathfinder.models
 
 import com.avaje.ebean.Model
-import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Transient,Column,OneToMany,JoinColumn}
+import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Column,OneToMany}
 import play.api.libs.json.{Format,Reads,Json,JsValue}
-import javax.inject.Inject
-
-/**
- * @author hansondg
- */
 
 object Vehicle extends CrudCompanion[Long,Vehicle]{
     
@@ -25,9 +20,9 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
         capacity:  Option[Int]
     ) extends super.Update[Vehicle] {
         override def apply(v: Vehicle): Boolean = {
-            latitude.map  { v.latitude  = _ }
-            longitude.map { v.longitude = _ }
-            capacity.map  { v.capacity  = _ }
+            latitude.map  ( v.latitude  = _ )
+            longitude.map ( v.longitude = _ )
+            capacity.map  ( v.capacity  = _ )
             latitude.isDefined && longitude.isDefined && capacity.isDefined
         }
     }
