@@ -6,3 +6,9 @@
 GET     /                           io.pathfinder.controllers.Application.index
 
 GET     /vehicle/:id                io.pathfinder.controllers.VehicleController.get(id: Long)
+
+POST    /vehicle                    io.pathfinder.controllers.VehicleController.post
+
+PUT     /vehicle/:id                io.pathfinder.controllers.VehicleController.put(id: Long)
+
+DELETE  /vehicle/:id                io.pathfinder.controllers.VehicleController.delete(id: Long)
