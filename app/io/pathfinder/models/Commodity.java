@@ -11,7 +11,7 @@ public class Commodity extends Model {
 
   @Id
   @Column(name = "id", nullable = false)
-  @GeneratedValue(strategy = GenerationType.AUTO)
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
   public long id;
 
   @Column(name = "startLatitude", nullable = false)
@@ -28,4 +28,8 @@ public class Commodity extends Model {
 
   @Column(name = "param")
   public int param;
+
+  public static Finder<Long, Commodity> find = new Finder<Long, Commodity>(
+      Long.class, Commodity.class
+  );
 }
