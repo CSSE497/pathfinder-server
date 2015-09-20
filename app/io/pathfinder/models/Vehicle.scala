@@ -1,42 +1,64 @@
 package io.pathfinder.models
 
 import com.avaje.ebean.Model
-import javax.persistence.{Id,Entity,GeneratedValue,GenerationType}
+import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Transient}
 import play.data.validation.Constraints.Required
-import play.api.libs.json.Json
-import play.api.libs.json.{Reads,Writes}
-import play.api.libs.functional.syntax._
+import play.api.libs.json.{Format,Reads,Json,JsValue}
+import javax.inject.Inject
 
 /**
  * @author hansondg
  */
 
-//object Vehicle extends CrudCompanion[Long,Vehicle]{
-//    override val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
-//    override object writes extends Writes[Vehicle] {
-//        override def writes(v: Vehicle) = Json.obj(
-//            "id" -> v.id.longValue(),
-//            "position" -> Json.obj(
-//                "lat" -> v.latitude.doubleValue(),
-//                "lng" -> v.longitude.doubleValue()
-//            ),
-//            "capacity" -> v.capacity.intValue()
-//        )
-//    }
-//}
-//
-//@Entity
-//class Vehicle(
-//    @Id
-//    @GeneratedValue(strategy = GenerationType.AUTO)
-//    var id: java.lang.Long,
-//
-//    @Required
-//    var latitude: java.lang.Double,
-//
-//    @Required
-//    var longitude: java.lang.Double,
-//
-//    @Required
-//    var capacity: java.lang.Integer
-//) extends Model
+object Vehicle extends CrudCompanion[Long,Vehicle]{
+    
+    override val format: Format[Vehicle] = Json.format[Vehicle]
+
+    override val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
+
+    override object Update extends UpdateCompanion[Vehicle,Update]{
+        override val reads = Json.reads[Update]
+    }
+
+    case class Update(
+        latitude:  Option[Double],
+        longitude: Option[Double],
+        capacity:  Option[Int]
+    ) extends super.Update[Vehicle] {
+        override def apply(v: Vehicle){
+            latitude.map  { v.latitude  = _ }
+            longitude.map { v.longitude = _ }
+            capacity.map  { v.capacity  = _ }
+        }
+    }
+
+    override def create() = new Vehicle
+
+    def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle = {
+        val v = new Vehicle
+        v.id = id
+        v.latitude = latitude
+        v.longitude = longitude
+        v.capacity = capacity
+        return v
+    }
+
+    def unapply(v: Vehicle): Option[(Long, Double, Double, Int)] = Some((v.id, v.latitude, v.longitude, v.capacity))
+}
+
+@Entity
+class Vehicle() extends Model {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    var id: Long = 0
+
+    @Required
+    var latitude: Double = 0
+
+    @Required
+    var longitude: Double = 0
+
+    @Required
+    var capacity: Int = 0
+}
