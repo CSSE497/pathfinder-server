@@ -25,10 +25,11 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
         longitude: Option[Double],
         capacity:  Option[Int]
     ) extends super.Update[Vehicle] {
-        override def apply(v: Vehicle){
+        override def apply(v: Vehicle): Boolean = {
             latitude.map  { v.latitude  = _ }
             longitude.map { v.longitude = _ }
             capacity.map  { v.capacity  = _ }
+            latitude.isDefined && longitude.isDefined && capacity.isDefined
         }
     }
 
@@ -50,7 +51,7 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
 class Vehicle() extends Model {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0
 
     @Required

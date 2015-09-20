@@ -16,7 +16,7 @@ package controllers {
 
     class Application extends Controller {
         def index = Action {
-            Ok("<html><head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js\"></script></head><body>Pathfinder Webservice</body></html>").as(HTML)
+            Ok("Pathfinder Webservice")
         }
     }
 
@@ -25,30 +25,48 @@ package controllers {
         import comp._
 
         def get(id: K) = Action{    // TODO: proper error handling
-            val vehicle = comp.finder.byId(id)
-            Ok(Json.toJson(vehicle))
+            Option(comp.finder.byId(id)).map{
+                vehicle => Ok(Json.toJson(vehicle))
+            } getOrElse (
+                NotFound
+            )
         }
 
         def post = Action(parse.json){ request =>
-            val update = updateReads.reads(request.body).get
-            val model = comp.create
-            update.apply(model)
-            model.insert()
-            Created
+            updateReads.reads(request.body).map {
+                update =>
+                    val model = comp.create
+                    if(!update(model)){
+                        BadRequest
+                    } else {
+                        model.insert()
+                        Created(Json.toJson(model))
+                    }
+            } getOrElse {
+                BadRequest
+            }
         }
 
         @Transactional
         def put(id: K) = Action(parse.json){ request =>
-            val update = updateReads.reads(request.body).get
-            val model = comp.finder.byId(id)
-            update.apply(model)
-            model.save
-            Ok
+            updateReads.reads(request.body).map {
+                update =>
+                    Option(comp.finder.byId(id)).map{
+                        model =>
+                            update.apply(model)
+                            model.save()
+                            Ok(Json.toJson(model))
+                    } getOrElse(NotFound)
+            } getOrElse (BadRequest)
         }
 
+        @Transactional
         def delete(id: K) = Action {
-            comp.finder.deleteById(id)
-            Ok
+            Option(comp.finder.byId(id)).map{
+                model =>
+                    model.delete
+                    Ok
+            } getOrElse (NotFound)
         }
     }
 
