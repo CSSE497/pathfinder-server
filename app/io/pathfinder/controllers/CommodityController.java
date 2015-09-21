@@ -4,16 +4,12 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import play.mvc.*;
+import play.mvc.Controller;
 import io.pathfinder.models.Commodity;
-
+import play.mvc.Result;
 import java.util.Iterator;
+import play.libs.Json;
 
-import static play.libs.Json.*;
-
-/**
- * Created by Carter on 9/17/2015.
- */
 public class CommodityController extends Controller {
 
   private JsonContext jsonContext = Ebean.createJsonContext();
@@ -41,7 +37,7 @@ public class CommodityController extends Controller {
     Commodity commodity;
 
     try {
-      commodity = fromJson(json, Commodity.class);
+      commodity = Json.fromJson(json, Commodity.class);
     } catch (Exception e) {
       return badRequest("Unable to map json to commodity object: " + e.getMessage());
     }
@@ -62,7 +58,7 @@ public class CommodityController extends Controller {
       return notFound();
     }
 
-    ObjectNode commodityJson = (ObjectNode) toJson(commodity);
+    ObjectNode commodityJson = (ObjectNode) Json.toJson(commodity);
     ObjectNode body;
 
     try {
@@ -84,7 +80,7 @@ public class CommodityController extends Controller {
     }
 
     try {
-      commodity = fromJson(commodityJson, Commodity.class);
+      commodity = Json.fromJson(commodityJson, Commodity.class);
       commodity.update();
 
       return ok();
