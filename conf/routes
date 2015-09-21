@@ -2,6 +2,9 @@
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
 
+# CORS
+OPTIONS /*all                       io.pathfinder.controllers.PreFlight.preflight(all)
+
 # Home page
 GET     /                           io.pathfinder.controllers.Application.index
 GET     /vehicle                    io.pathfinder.controllers.VehicleController.getAll

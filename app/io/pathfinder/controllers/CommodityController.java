@@ -4,7 +4,6 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import play.api.libs.json.JsPath;
 import play.mvc.*;
 import io.pathfinder.models.Commodity;
 
