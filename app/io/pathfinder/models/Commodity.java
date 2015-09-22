@@ -1,11 +1,13 @@
 package io.pathfinder.models;
 
 import com.avaje.ebean.Model;
-import javax.persistence.*;
 
-/**
- * Created by Carter on 9/17/2015.
- */
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Column;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+
 @Entity(name = "Commodity")
 public class Commodity extends Model {
 

@@ -11,6 +11,7 @@ libraryDependencies ++= Seq(
   javaJdbc,
   cache,
   ws,
+  filters,
   specs2 % Test,
   "org.avaje.ebeanorm" % "avaje-ebeanorm-api" % "3.1.1",
   "com.google.maps" % "google-maps-services" % "0.1.7",
