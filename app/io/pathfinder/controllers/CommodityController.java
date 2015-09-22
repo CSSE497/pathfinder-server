@@ -10,6 +10,8 @@ import play.mvc.Result;
 import java.util.Iterator;
 import play.libs.Json;
 
+import javax.persistence.PersistenceException;
+
 public class CommodityController extends Controller {
 
   private JsonContext jsonContext = Ebean.createJsonContext();
@@ -38,16 +40,13 @@ public class CommodityController extends Controller {
 
     try {
       commodity = Json.fromJson(json, Commodity.class);
-    } catch (Exception e) {
-      return badRequest("Unable to map json to commodity object: " + e.getMessage());
-    }
-
-    try {
       commodity.save();
 
       return created(jsonContext.toJson(commodity));
-    } catch (Exception e) {
+    } catch (PersistenceException e) {
       return internalServerError("Error saving commodity to the database: " + e.getMessage());
+    } catch (Exception e) {
+      return badRequest("Unable to map json to commodity object: " + e.getMessage());
     }
   }
 
