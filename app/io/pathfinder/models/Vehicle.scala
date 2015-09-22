@@ -3,6 +3,7 @@ package io.pathfinder.models
 import com.avaje.ebean.Model
 import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Column,OneToMany}
 import play.api.libs.json.{Format,Reads,Json,JsValue}
+import scala.collection.mutable.Buffer
 
 object Vehicle extends CrudCompanion[Long,Vehicle]{
     
@@ -27,7 +28,7 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
         }
     }
 
-    override def create() = new Vehicle
+    override def create = new Vehicle
 
     def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle = {
         val v = new Vehicle
@@ -40,8 +41,6 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
 
     def unapply(v: Vehicle): Option[(Long, Double, Double, Int)] = Some((v.id, v.latitude, v.longitude, v.capacity))
 }
-
-import scala.collection.mutable.Buffer
 
 @Entity
 class Vehicle() extends Model {
