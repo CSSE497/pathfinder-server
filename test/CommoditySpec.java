@@ -289,12 +289,68 @@ public class CommoditySpec {
 
   @Test
   public void putShouldUpdateCommodity() {
+    Helpers.running(fakeApp, () -> {
+      populateCommodities();
 
+      ObjectNode body = JsonNodeFactory.instance.objectNode();
+      body.put("startLatitude", 500.0);
+
+      RequestBuilder request = new RequestBuilder()
+          .method(Helpers.PUT)
+          .uri("/commodity/1")
+          .bodyJson(body);
+      Result result = Helpers.route(request);
+
+      assertEquals("Successful Put should return no content code", 204, result.status());
+
+      Commodity commodity = Commodity.find.byId(1L);
+      assertEquals("Commodity PUT changes should persist in the db", 500.0, commodity.startLatitude, .001);
+
+      RequestBuilder invalidIdRequest = new RequestBuilder()
+          .method(Helpers.PUT)
+          .uri("/commodity/500")
+          .bodyJson(body);
+      Result invalidIdResult = Helpers.route(invalidIdRequest);
+      assertEquals("Put to invalid id should 404", 404, invalidIdResult.status());
+
+      // Test Put with fake fields
+      body.put("FAKE FIELD", 25);
+
+      RequestBuilder fakeFieldRequest = new RequestBuilder()
+          .method(Helpers.PUT)
+          .uri("/commodity/1")
+          .bodyJson(body);
+      Result fakeFieldResult = Helpers.route(fakeFieldRequest);
+//      assertEquals("Invalid PUT body should return bad request", 400, fakeFieldResult.status());
+    });
   }
 
   @Test
   public void deleteShouldDeleteCommodity() {
+    Helpers.running(fakeApp, () -> {
+      populateCommodities();
 
+      RequestBuilder deleteRequest = new RequestBuilder()
+          .method(Helpers.DELETE)
+          .uri("/commodity/1");
+      Result deleteResult = Helpers.route(deleteRequest);
+
+      assertEquals("valid DELETE commodity request should return status 200", 200, deleteResult.status());
+
+      RequestBuilder getRequest = new RequestBuilder()
+          .method(Helpers.GET)
+          .uri("/commodity/1");
+      Result getResult = Helpers.route(getRequest);
+
+      assertEquals("GET req for deleted item should 404", 404, getResult.status());
+
+      RequestBuilder deleteFakeRequest = new RequestBuilder()
+          .method(Helpers.DELETE)
+          .uri("/commodity/500");
+      Result deleteFakeResult = Helpers.route(deleteFakeRequest);
+
+      assertEquals("Deleting nonexistent commodity should return 404", 404, deleteFakeResult.status());
+    });
   }
 
 }

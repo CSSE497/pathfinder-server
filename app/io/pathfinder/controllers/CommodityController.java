@@ -82,7 +82,7 @@ public class CommodityController extends Controller {
       commodity = Json.fromJson(commodityJson, Commodity.class);
       commodity.update();
 
-      return ok();
+      return noContent();
     } catch (Exception e) {
       return badRequest("Unable to update commodity: " + e.getMessage());
     }
