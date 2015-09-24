@@ -11,7 +11,7 @@ object Vehicle {
     val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
 
     object Dao extends EbeanCrudDao[Long,Vehicle,Model.Finder[Long,Vehicle]](finder){
-        override def construct = Vehicle.create
+        override def construct = new Vehicle
     }
 
     implicit val format: Format[Vehicle] = Json.format[Vehicle]
@@ -30,8 +30,6 @@ object Vehicle {
             latitude.isDefined && longitude.isDefined && capacity.isDefined
         }
     }
-
-    def create = new Vehicle
 
     def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle = {
         val v = new Vehicle

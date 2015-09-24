@@ -7,7 +7,6 @@ import scala.collection.JavaConversions.asScalaBuffer
 
 abstract class EbeanCrudDao[K,M <: Model,F <: Model.Finder[K,M]](finder: F) extends CrudDao[K,M] {
 
-
     final override def create(model: M): M = {
         model.insert()
         model
