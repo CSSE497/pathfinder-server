@@ -1,7 +1,6 @@
 package io.pathfinder.data
 
 import com.avaje.ebean.Model
-import com.avaje.ebean.Transaction
 import play.db.ebean.Transactional
 import scala.collection.JavaConversions.asScalaBuffer
 

@@ -2,7 +2,6 @@ package io.pathfinder.controllers
 
 import play.api.mvc.{Controller,Action}
 import play.api.libs.json.{Json,Reads,Writes}
-import com.avaje.ebean.{Model,Ebean}
 import io.pathfinder.data.{CrudDao,Update}
 
 /**

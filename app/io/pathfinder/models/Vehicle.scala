@@ -1,8 +1,8 @@
 package io.pathfinder.models
 
 import com.avaje.ebean.Model
-import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Column,OneToMany}
-import play.api.libs.json.{Format,Reads,Json,JsValue}
+import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Column}
+import play.api.libs.json.{Format,Reads,Json}
 import scala.collection.mutable.Buffer
 import io.pathfinder.data.{Update,EbeanCrudDao}
 
