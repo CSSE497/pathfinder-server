@@ -1,17 +1,15 @@
 package io.pathfinder.controllers
 
 import play.api.mvc.{Controller,Action}
-import play.api.libs.json.Json
+import play.api.libs.json.{Json,Reads,Writes}
 import com.avaje.ebean.{Model,Ebean}
-import io.pathfinder.models.CrudCompanion
 import io.pathfinder.data.{CrudDao,Update}
 
 /**
  * A controller that implements CRUD methods to any controller that extends it
  */
-abstract class CrudController[K,V](comp: CrudCompanion[K,V], dao: CrudDao[K,V]) extends Controller {
-
-    import comp.{format,updateReads}
+abstract class CrudController[K,V](dao: CrudDao[K,V])
+        (implicit val reads: Reads[V], implicit val writes: Writes[V], implicit val updates: Reads[_ <: Update[V]]) extends Controller {
 
     /**
      * returns all of this controller's models
@@ -32,16 +30,16 @@ abstract class CrudController[K,V](comp: CrudCompanion[K,V], dao: CrudDao[K,V]) 
      * with a 201 code.
      */
     def post = Action(parse.json){ request =>
-        updateReads.reads(request.body).map {
+        updates.reads(request.body).map {
             update =>
-                val model = comp.create
-                if(update(model)){
-                    dao.create(model)
-                    Created(Json.toJson(model))
-                } else BadRequest
-        } getOrElse {
+                dao.create(update).map {
+                    model => Created(Json.toJson(model))
+                } getOrElse(
+                    BadRequest // received incomplete model
+                )
+        } getOrElse (
             BadRequest
-        }
+        )
     }
 
     /**
@@ -50,7 +48,7 @@ abstract class CrudController[K,V](comp: CrudCompanion[K,V], dao: CrudDao[K,V]) 
      * if successful.
      */
     def put(id: K) = Action(parse.json){ request =>
-        updateReads.reads(request.body).map {
+        updates.reads(request.body).map {
             update =>
                 dao.update(id,update).map{
                     model =>

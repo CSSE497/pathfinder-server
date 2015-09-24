@@ -5,12 +5,21 @@ import com.avaje.ebean.Transaction
 import play.db.ebean.Transactional
 import scala.collection.JavaConversions.asScalaBuffer
 
-class EbeanCrudDao[K,M <: Model,F <: Model.Finder[K,M]](finder: F) extends CrudDao[K,M] {
+abstract class EbeanCrudDao[K,M <: Model,F <: Model.Finder[K,M]](finder: F) extends CrudDao[K,M] {
 
 
     final override def create(model: M): M = {
         model.insert()
         model
+    }
+
+    final def create(update: Update[M]): Option[M] = {
+        val model = construct
+        if(update(model)){
+            Some(create(model))
+        } else {
+            None
+        }
     }
 
     @Transactional

@@ -4,15 +4,19 @@ import com.avaje.ebean.Model
 import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Column,OneToMany}
 import play.api.libs.json.{Format,Reads,Json,JsValue}
 import scala.collection.mutable.Buffer
-import io.pathfinder.data.Update
+import io.pathfinder.data.{Update,EbeanCrudDao}
 
-object Vehicle extends CrudCompanion[Long,Vehicle]{
+object Vehicle {
 
     val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
-    
-    override val format: Format[Vehicle] = Json.format[Vehicle]
 
-    override val updateReads: Reads[VehicleUpdate] = Json.reads[VehicleUpdate]
+    object Dao extends EbeanCrudDao[Long,Vehicle,Model.Finder[Long,Vehicle]](finder){
+        override def construct = Vehicle.create
+    }
+
+    implicit val format: Format[Vehicle] = Json.format[Vehicle]
+
+    implicit val updateReads: Reads[VehicleUpdate] = Json.reads[VehicleUpdate]
 
     case class VehicleUpdate(
         latitude:  Option[Double],
@@ -27,7 +31,7 @@ object Vehicle extends CrudCompanion[Long,Vehicle]{
         }
     }
 
-    override def create = new Vehicle
+    def create = new Vehicle
 
     def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle = {
         val v = new Vehicle
