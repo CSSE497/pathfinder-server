@@ -2,27 +2,25 @@ package io.pathfinder.controllers
 
 import play.api.mvc.{Controller,Action}
 import play.api.libs.json.Json
-import play.db.ebean.Transactional
-import scala.collection.JavaConversions.asScalaBuffer
 import com.avaje.ebean.{Model,Ebean}
 import io.pathfinder.models.CrudCompanion
+import io.pathfinder.data.{CrudDao,Update}
 
 /**
- * A controller that implements CRUD methods to any controller that extends it, requires
- * an Ebean model's CrudCompanion
+ * A controller that implements CRUD methods to any controller that extends it
  */
-abstract class CrudController[K,V <: Model](comp: CrudCompanion[K,V]) extends Controller {
+abstract class CrudController[K,V](comp: CrudCompanion[K,V], dao: CrudDao[K,V]) extends Controller {
 
-    import comp.{format,updateReads,finder}
+    import comp.{format,updateReads}
 
     /**
      * returns all of this controller's models
      */
-    def getAll = Action(Ok(Json.toJson(finder.all.toList)))
+    def getAll = Action(Ok(Json.toJson(dao.readAll)))
 
     def get(id: K) = Action{
-        Option(finder.byId(id)).map{
-            vehicle => Ok(Json.toJson(vehicle))
+        dao.read(id).map{
+            model => Ok(Json.toJson(model))
         } getOrElse (
             NotFound
         )
@@ -37,12 +35,10 @@ abstract class CrudController[K,V <: Model](comp: CrudCompanion[K,V]) extends Co
         updateReads.reads(request.body).map {
             update =>
                 val model = comp.create
-                if(!update(model)){
-                    BadRequest
-                } else {
-                    model.insert()
+                if(update(model)){
+                    dao.create(model)
                     Created(Json.toJson(model))
-                }
+                } else BadRequest
         } getOrElse {
             BadRequest
         }
@@ -53,14 +49,11 @@ abstract class CrudController[K,V <: Model](comp: CrudCompanion[K,V]) extends Co
      * It returns 400 if the json is invalid. It returns 200 along with the newly updated model
      * if successful.
      */
-    @Transactional
     def put(id: K) = Action(parse.json){ request =>
         updateReads.reads(request.body).map {
             update =>
-                Option(finder.byId(id)).map{
+                dao.update(id,update).map{
                     model =>
-                        update.apply(model)
-                        model.save()
                         Ok(Json.toJson(model))
                 } getOrElse(NotFound)
         } getOrElse (BadRequest)
@@ -69,11 +62,9 @@ abstract class CrudController[K,V <: Model](comp: CrudCompanion[K,V]) extends Co
     /**
      * Deletes the row with the specified id, returns 404 if the id does not exist prior to deleting.
      */
-    @Transactional
     def delete(id: K) = Action {
-        Option(finder.byId(id)).map{
+        dao.delete(id).map{
             model =>
-                model.delete
                 Ok(Json.toJson(model))
         } getOrElse (NotFound)
     }

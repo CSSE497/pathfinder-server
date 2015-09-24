@@ -4,22 +4,21 @@ import com.avaje.ebean.Model
 import javax.persistence.{Id,Entity,GeneratedValue,GenerationType,Column,OneToMany}
 import play.api.libs.json.{Format,Reads,Json,JsValue}
 import scala.collection.mutable.Buffer
+import io.pathfinder.data.Update
 
 object Vehicle extends CrudCompanion[Long,Vehicle]{
+
+    val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
     
     override val format: Format[Vehicle] = Json.format[Vehicle]
 
-    override val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
+    override val updateReads: Reads[VehicleUpdate] = Json.reads[VehicleUpdate]
 
-    override object Update extends UpdateCompanion[Vehicle,Update]{
-        override val reads = Json.reads[Update]
-    }
-
-    case class Update(
+    case class VehicleUpdate(
         latitude:  Option[Double],
         longitude: Option[Double],
         capacity:  Option[Int]
-    ) extends super.Update[Vehicle] {
+    ) extends Update[Vehicle] {
         override def apply(v: Vehicle): Boolean = {
             latitude.map  ( v.latitude  = _ )
             longitude.map ( v.longitude = _ )
