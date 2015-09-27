@@ -32,7 +32,5 @@ public class Commodity extends Model {
   @Column(name = "param")
   public int param;
 
-  public static Finder<Long, Commodity> find = new Finder<Long, Commodity>(
-      Long.class, Commodity.class
-  );
+  public static Find<Long, Commodity> find = new Find<Long, Commodity>() {};
 }

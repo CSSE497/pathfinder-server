@@ -11,7 +11,7 @@ public class Cluster extends Model {
   @Id
   @Column(nullable = false)
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  public int id;
+  public long id;
 
   @ManyToOne
   public Cluster parent;
@@ -25,4 +25,5 @@ public class Cluster extends Model {
   @OneToMany(cascade = CascadeType.ALL)
   public List<Commodity> commodities;
 
+  public static Find<Long, Cluster> find = new Find<Long, Cluster>(){};
 }

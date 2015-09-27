@@ -71,8 +71,9 @@ public class CommodityController extends Controller {
     while (fields.hasNext()) {
       String field = fields.next();
 
-      if (field.equals("id"))
+      if (field.equals("id")) {
         continue;
+      }
 
       if (body.has(field)) {
         commodityJson.replace(field, body.findPath(field));
