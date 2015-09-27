@@ -16,6 +16,7 @@ public class Commodity extends Model {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   public long id;
 
+
   @Column(name = "startLatitude", nullable = false)
   public double startLatitude;
 

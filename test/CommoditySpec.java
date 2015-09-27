@@ -26,7 +26,7 @@ public class CommoditySpec {
   private FakeApplication fakeApp;
 
   private JsonNode bodyForResult(Result r) {
-    String resultBody = null;
+    String resultBody;
 
     try {
       resultBody = new String(JavaResultExtractor.getBody(r, 0L), "UTF-8");
@@ -147,65 +147,6 @@ public class CommoditySpec {
         assertEquals("db record should have correct value for param",
             5, resultJson.findPath("param").asInt());
       });
-  }
-
-  @Test
-  public void malformedPostShouldReturnBadRequest() {
-    Helpers.running(fakeApp, () -> {
-      ObjectNode body = jsonNodeFactory.objectNode();
-
-      body.put("startLatitude", 1.0);
-      body.put("startLongitude", 2.0);
-      body.put("endLatitude", 3.0);
-      body.put("endLongitude", 4.0);
-      body.put("param", 5);
-
-      RequestBuilder request = new RequestBuilder()
-          .bodyJson(body)
-          .header("Content-Type", "application/json")
-          .method(Helpers.POST)
-          .uri("/commodity");
-
-      // Test type mismatch
-      body.replace("startLatitude", jsonNodeFactory.booleanNode(false));
-      Result result = Helpers.route(request);
-      assertEquals(400, result.status());
-      body.replace("startLatitude:", jsonNodeFactory.numberNode(1.0));
-
-      body.replace("endLatitude", jsonNodeFactory.textNode("qwerty"));
-      result = Helpers.route(request);
-      assertEquals(400, result.status());
-      body.replace("endLatitude", jsonNodeFactory.numberNode(3.0));
-
-      // Test missing
-      body.remove("startLongitude");
-      result = Helpers.route(request);
-      assertEquals(400, result.status());
-      body.put("startLongitude", 2.0);
-
-      body.remove("startLatitude");
-      body.remove("param");
-      result = Helpers.route(request);
-      assertEquals(400, result.status());
-      body.put("startLatitude", 1.0);
-      body.put("param", 5);
-
-      // Test Extremes
-      body.replace("startLatitude", jsonNodeFactory.numberNode(Double.MAX_VALUE));
-      result = Helpers.route(request);
-      assertEquals(400, result.status());
-      body.replace("startLatitude", jsonNodeFactory.numberNode(1.0));
-
-      // Test incorrect content type
-      RequestBuilder textRequest = new RequestBuilder()
-          .bodyJson(body)
-          .header("Content-Type", "text/plain")
-          .method(Helpers.POST)
-          .uri("/commodity");
-
-      result = Helpers.route(textRequest);
-      assertEquals(415, result.status());
-    });
   }
 
   @Test
