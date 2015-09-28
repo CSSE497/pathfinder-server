@@ -4,6 +4,7 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import javassist.compiler.SymbolTable;
 import play.libs.Json;
 import play.mvc.Controller;
 import io.pathfinder.models.Cluster;
@@ -39,6 +40,7 @@ public class ClusterController extends Controller {
 
         try {
             cluster = Json.fromJson(json, Cluster.class);
+
             cluster.save();
             return created(jsonContext.toJson(cluster));
         } catch (PersistenceException e) {
@@ -59,7 +61,8 @@ public class ClusterController extends Controller {
         ObjectNode body;
 
         try {
-            body = (ObjectNode) request().body().asJson();
+            JsonNode json = request().body().asJson();
+            body = (ObjectNode) json;
         } catch (ClassCastException e) {
             return badRequest("Cannot cast request body to ObjectNode: " + e.getMessage());
         }
@@ -68,7 +71,7 @@ public class ClusterController extends Controller {
         while (fields.hasNext()) {
             String field = fields.next();
 
-            if (fields.equals("id")) {
+            if (field.equals("id")) {
                 continue;
             }
 
@@ -79,6 +82,7 @@ public class ClusterController extends Controller {
 
         try {
             cluster = Json.fromJson(clusterJson, Cluster.class);
+
             cluster.update();
 
             return noContent();

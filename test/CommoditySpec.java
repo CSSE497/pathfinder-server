@@ -165,7 +165,7 @@ public class CommoditySpec {
       List<Commodity> commodities = new LinkedList<Commodity>();
 
       for (int i = 0; i < resultJson.size(); i++) {
-        ObjectNode commodityNode = (ObjectNode) resultJson.get(0);
+        ObjectNode commodityNode = (ObjectNode) resultJson.get(i);
         commodities.add(Json.fromJson(commodityNode, Commodity.class));
       }
 

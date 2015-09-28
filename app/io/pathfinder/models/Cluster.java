@@ -1,6 +1,7 @@
 package io.pathfinder.models;
 
 import com.avaje.ebean.Model;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import javax.persistence.*;
 import java.util.List;
@@ -13,10 +14,11 @@ public class Cluster extends Model {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   public long id;
 
+  @JsonIgnore
   @ManyToOne
   public Cluster parent;
 
-  @OneToMany(mappedBy="parent")
+  @OneToMany(mappedBy="parent", cascade = CascadeType.ALL)
   public List<Cluster> subClusters;
 
   @OneToMany(cascade = CascadeType.ALL)
