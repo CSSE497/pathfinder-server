@@ -15,13 +15,18 @@ import play.core.j.JavaResultExtractor;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.Before;
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.pathfinder.models.Cluster;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -38,7 +43,7 @@ public class ClusterSpec {
 
             ObjectMapper mapper = new ObjectMapper();
             return mapper.readTree(resultBody);
-        } catch(Exception e) {
+        } catch(IOException e) {
             fail("Could not process database record");
             return null;
         }
@@ -255,16 +260,6 @@ public class ClusterSpec {
                     .bodyJson(body);
             Result invalidIdResult = Helpers.route(invalidIdRequest);
             assertEquals("Put to invalid id should 404", 404, invalidIdResult.status());
-
-            // Test Put with fake fields
-            body.put("FAKE_FIELD", 25);
-
-            RequestBuilder fakeFieldRequest = new RequestBuilder()
-                    .method(Helpers.PUT)
-                    .uri("/cluster/1")
-                    .bodyJson(body);
-            Result fakeFieldResult = Helpers.route(fakeFieldRequest);
-//            assertEquals("Invalid PUT body should return bad request", 400, fakeFieldResult.status());
         });
     }
 
@@ -285,7 +280,7 @@ public class ClusterSpec {
                     .uri("/cluster/1");
             Result getResult = Helpers.route(getRequest);
 
-            assertEquals("GET req for deleted item should 404", 404, getResult.status());
+            assertEquals("GET req for deleted cluster should 404", 404, getResult.status());
 
             RequestBuilder deleteFakeRequest = new RequestBuilder()
                     .method(Helpers.DELETE)

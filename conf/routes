@@ -1,9 +1,6 @@
 # Routes
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
-
-GET           /                     io.pathfinder.controllers.ViewController.index
-
 GET           /vehicle              io.pathfinder.controllers.VehicleController.getAll
 GET           /vehicle/:id          io.pathfinder.controllers.VehicleController.get(id: Long)
 POST          /vehicle              io.pathfinder.controllers.VehicleController.post

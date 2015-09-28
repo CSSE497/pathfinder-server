@@ -4,7 +4,6 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import javassist.compiler.SymbolTable;
 import play.libs.Json;
 import play.mvc.Controller;
 import io.pathfinder.models.Cluster;
@@ -45,7 +44,7 @@ public class ClusterController extends Controller {
             return created(jsonContext.toJson(cluster));
         } catch (PersistenceException e) {
             return internalServerError("Error saving cluster to the database: " + e.getMessage());
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return badRequest("Unable to map json to commodity object: " + e.getMessage());
         }
     }
@@ -86,7 +85,7 @@ public class ClusterController extends Controller {
             cluster.update();
 
             return noContent();
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return badRequest("Unable to update cluster: " + e.getMessage());
         }
     }
