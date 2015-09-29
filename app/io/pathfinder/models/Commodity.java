@@ -1,12 +1,9 @@
 package io.pathfinder.models;
 
 import com.avaje.ebean.Model;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Column;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
+import javax.persistence.*;
 
 @Entity(name = "Commodity")
 public class Commodity extends Model {
@@ -29,10 +26,12 @@ public class Commodity extends Model {
   @Column(name = "endLongitude", nullable = false)
   public double endLongitude;
 
+  @JsonIgnore
+  @ManyToOne
+  public Cluster parent;
+
   @Column(name = "param")
   public int param;
 
-  public static Finder<Long, Commodity> find = new Finder<Long, Commodity>(
-      Long.class, Commodity.class
-  );
+  public static Find<Long, Commodity> find = new Find<Long, Commodity>() {};
 }
