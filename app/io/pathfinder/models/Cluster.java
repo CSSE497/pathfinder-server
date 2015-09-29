@@ -32,7 +32,7 @@ public class Cluster extends Model {
   @OneToMany(cascade = CascadeType.ALL)
   public List<Vehicle> vehicles;
 
-  @OneToMany(cascade = CascadeType.ALL)
+  @OneToMany(mappedBy="parent", cascade = CascadeType.ALL)
   public List<Commodity> commodities;
 
   public static Find<Long, Cluster> find = new Find<Long, Cluster>(){};
