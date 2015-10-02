@@ -1,10 +1,8 @@
 package io.pathfinder.websockets
 
-import com.avaje.ebean
 import akka.actor.{Props, Actor, ActorRef}
 import io.pathfinder.websockets.ModelTypes._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.api.libs.iteratee.{Concurrent, Iteratee}
 import io.pathfinder.websockets.controllers.{WebSocketController, VehicleSocketController}
 
 object WebSocketActor {

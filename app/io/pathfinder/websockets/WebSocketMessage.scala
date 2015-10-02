@@ -1,8 +1,7 @@
 package io.pathfinder.websockets
 
-import play.api.libs.json.{Format,Json,Reads,Writes,JsObject}
+import play.api.libs.json._
 import play.api.mvc.WebSocket.FrameFormatter
-import play.api.libs.json._ // JSON library
 
 /**
  * Contains all of the web socket messages and their json formats
@@ -13,10 +12,16 @@ object WebSocketMessage {
   import ModelTypes.{ModelType,format=>modelFormat}
   import Events.{Event,format=>eventFormat}
 
+  /**
+   * These messages are routed to controllers based on the model they contain
+   */
   sealed abstract class ControllerMessage extends WebSocketMessage {
     val model: ModelType
   }
 
+  /**
+   * Standard error messages sent to client that make poor request
+   */
   case class ErrorMessage(error: String) extends WebSocketMessage
   implicit val errorMessageFormat = Json.format[ErrorMessage]
 
@@ -26,6 +31,9 @@ object WebSocketMessage {
     override def writes(o: UnknownMessage): JsValue = o.value
   }
 
+  /**
+   * Sent by the client to unsubscribe from push notifications
+   */
   case class UnSubscribe(
     cluster: Option[Long],
     model:   Option[ModelType],
@@ -34,6 +42,9 @@ object WebSocketMessage {
   ) extends WebSocketMessage
   implicit val unSubscribeFormat = Json.format[UnSubscribe]
 
+  /**
+   * Sent by the client to subscribe to push notifications
+   */
   case class Subscribe(
     cluster: Long,
     model:   Option[ModelType],
@@ -42,12 +53,18 @@ object WebSocketMessage {
   ) extends WebSocketMessage
   implicit val subscribeFormat = Json.format[Subscribe]
 
+  /**
+   * Sent by the client to create a new model
+   */
   case class Create(
     model: ModelType,
     value: JsValue
   ) extends ControllerMessage
   implicit val createFormat = Json.format[Create]
 
+  /**
+   * Sent by the client to update a model with the specified id
+   */
   case class Update(
     model: ModelType,
     id:    Long,
@@ -55,42 +72,64 @@ object WebSocketMessage {
   ) extends ControllerMessage
   implicit val updateFormat = Json.format[Update]
 
+  /**
+   * Sent by the client to delete the specified model
+   */
   case class Delete(
     model: ModelType,
     id:     Long
   ) extends ControllerMessage
   implicit val deleteFormat = Json.format[Delete]
 
+  /**
+   * Sent by the client that wants to read a model from the database
+   */
   case class Read(
     model: ModelType,
     id:   Long
   ) extends ControllerMessage
   implicit val readFormat = Json.format[Read]
 
+  /**
+   * Message sent to the client that requested a read
+   */
   case class Created(
     model: ModelType,
     value: JsValue
   ) extends ControllerMessage
   implicit val createdFormat = Json.format[Created]
 
+  /**
+   * Message sent to a client that requested an update
+   * or any clients that have subscribed to updates
+   */
   case class Updated(
     model: ModelType,
     value: JsValue
   ) extends ControllerMessage
   implicit val updatedFormat = Json.format[Updated]
 
+  /**
+   * Message sent to a client that requested a read
+   */
   case class Model(
     model: ModelType,
     value: JsValue
   ) extends ControllerMessage
   implicit val modelFormat = Json.format[Model]
 
+  /**
+   * Message sent to a client that requested a delete
+   */
   case class Deleted(
     model: ModelType,
     value: JsValue
   ) extends ControllerMessage
   implicit val deletedFormat = Json.format[Deleted]
 
+  /**
+   * Message sent to a client that requested a subscribe
+   */
   case class Subscribed(
     cluster: Long,
     model:   Option[ModelType],
@@ -99,6 +138,9 @@ object WebSocketMessage {
   ) extends WebSocketMessage
   implicit val subscribedFormat = Json.format[Subscribed]
 
+  /**
+   * Message sent to a client that requested to unsubscribe
+   */
   case class UnSubscribed(
     cluster: Long,
     model:   Option[ModelType],
@@ -107,8 +149,11 @@ object WebSocketMessage {
   ) extends WebSocketMessage
   implicit val unSubscribedFormat = Json.format[UnSubscribed]
 
+  /**
+   * Converts json into WebSocketMessages
+   */
   implicit val reads: Reads[WebSocketMessage] =
-    (JsPath \ "create").read[Create].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "create").read[Create].map(identity[WebSocketMessage]) orElse // identity is used because Reads are not covariant
     (JsPath \ "read").read[Read].map(identity[WebSocketMessage]) orElse
     (JsPath \ "update").read[Update].map(identity[WebSocketMessage]) orElse
     (JsPath \ "delete").read[Delete].map(identity[WebSocketMessage]) orElse
@@ -122,6 +167,9 @@ object WebSocketMessage {
     (JsPath \ "unsubscribed").read[UnSubscribed].map(identity[WebSocketMessage]) orElse
     errorMessageFormat.map(identity[WebSocketMessage]) orElse unknownMessageFormat.map(identity[WebSocketMessage])
 
+  /**
+   * Converts WebSocketMessages into Json
+   */
   implicit object writes extends Writes[WebSocketMessage] {
 
     override def writes(o: WebSocketMessage): JsValue = o match {
@@ -142,6 +190,13 @@ object WebSocketMessage {
     }
   }
 
+  /**
+   * reads and writes WebSocketMessages from/to Json
+   */
   implicit val format: Format[WebSocketMessage] = Format(reads,writes)
+
+  /**
+   * reads and writes WebSocketMessages for the WebSocketActor, uses the format above
+   */
   implicit val frameFormat: FrameFormatter[WebSocketMessage] = FrameFormatter.jsonFrame[WebSocketMessage]
 }

@@ -3,9 +3,12 @@ package io.pathfinder.websockets.controllers
 import io.pathfinder.data.{CrudDao, Resource}
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
-import play.api.libs.json.{Json, Reads, Writes}
+import play.api.libs.json.{Reads, Writes}
 import com.avaje.ebean
 
+/**
+ * Adds basic crud support to any implementing controller
+ */
 abstract class WebSocketCrudController[V <: ebean.Model](
   model: ModelType,
   dao: CrudDao[Long,V]
