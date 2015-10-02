@@ -18,3 +18,5 @@ GET           /cluster/:id          io.pathfinder.controllers.ClusterController.
 POST          /cluster              io.pathfinder.controllers.ClusterController.createCluster()
 PUT           /cluster/:id          io.pathfinder.controllers.ClusterController.editCluster(id: Long)
 DELETE        /cluster/:id          io.pathfinder.controllers.ClusterController.deleteCluster(id: Long)
+
+GET           /socket               io.pathfinder.controllers.Application.socket()
