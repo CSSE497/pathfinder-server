@@ -3,15 +3,16 @@ package io.pathfinder.websockets
 import akka.actor.{Props, Actor, ActorRef}
 import io.pathfinder.websockets.ModelTypes._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import io.pathfinder.websockets.controllers.{WebSocketController, VehicleSocketController}
+import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
 
 object WebSocketActor {
+    val controllers: Map[ModelType,WebSocketController] = Map(
+        ModelTypes.Vehicle -> VehicleSocketController,
+        ModelTypes.Cluster -> ClusterSocketController,
+        ModelTypes.Commodity -> CommoditySocketController
+    )
 
-  val controllers: Map[ModelType,WebSocketController] = Map(
-    ModelTypes.Vehicle -> VehicleSocketController
-  )
-
-  def props(out: ActorRef) = Props(new WebSocketActor(out, controllers))
+    def props(out: ActorRef) = Props(new WebSocketActor(out, controllers))
 }
 
 /**
@@ -19,19 +20,19 @@ object WebSocketActor {
  * to push notifications.
  */
 class WebSocketActor (
-  client: ActorRef,
-  controllers: Map[ModelType, WebSocketController]
+    client: ActorRef,
+    controllers: Map[ModelType, WebSocketController]
 ) extends Actor {
-  import WebSocketMessage._
+    import WebSocketMessage._
 
-  override def receive = {
-    case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
-    case Subscribe(cluster, model, event, id) => {
-      client ! ErrorMessage("Not Implemented")
+    override def receive = {
+        case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
+        case Subscribe(cluster, model, event, id) => {
+            client ! ErrorMessage("Not Implemented")
+        }
+        case UnSubscribe(cluster, model, event, id) => {
+            client ! ErrorMessage("Not Implemented")
+        }
+        case UnknownMessage(value) => client ! ErrorMessage("Received unknown message: "+value.toString)
     }
-    case UnSubscribe(cluster, model, event, id) => {
-      client ! ErrorMessage("Not Implemented")
-    }
-    case UnknownMessage(value) => client ! ErrorMessage("Received unknown message: "+value.toString)
-  }
 }
