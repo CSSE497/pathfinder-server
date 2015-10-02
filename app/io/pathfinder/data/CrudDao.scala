@@ -1,6 +1,6 @@
 package io.pathfinder.data
 
-trait CrudDao[K,M] {
+abstract class CrudDao[K,M] {
 
     /**
      *  returns the default model should only constructs it, not save it
