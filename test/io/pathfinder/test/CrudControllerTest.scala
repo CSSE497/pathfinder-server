@@ -4,9 +4,8 @@ import org.scalatest.mock.MockitoSugar
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
-import play.api.mvc.Result
 import io.pathfinder.controllers.CrudController
-import io.pathfinder.data.{CrudDao,Update}
+import io.pathfinder.data.{Resource, CrudDao}
 import org.mockito.Mockito.when
 import org.mockito.Matchers.{anyLong,isA}
 
@@ -15,17 +14,22 @@ object CrudControllerTest extends MockitoSugar {
     case class TestModel(var id:Long,var name:String,var value:String)
 
     implicit val format = Json.format[TestModel]
-    implicit val updateReads = Json.reads[TestUpdate]
+    implicit val updateReads = Json.reads[TestResource]
 
-    case class TestUpdate(
+    case class TestResource(
         name:  Option[String],
         value: Option[String]
-    ) extends Update[TestModel] {
-        override def apply(m: TestModel): Boolean = {
-            name.map(m.name = _)
-            value.map(m.value = _)
-            value.isDefined && name.isDefined
+    ) extends Resource[TestModel] {
+        override def update(m: TestModel): Option[TestModel] = {
+            name.foreach(m.name = _)
+            value.foreach(m.value = _)
+            Some(m)
         }
+
+        override def create: Option[TestModel] = for{
+            n <- name
+            v <- value
+        } yield TestModel(0,n,v)
     }
 
     val mockDao = mock[CrudDao[Long,TestModel]]
@@ -33,7 +37,7 @@ object CrudControllerTest extends MockitoSugar {
 }
 
 class CrudControllerTest extends ControllerTest with MockitoSugar {
-    import CrudControllerTest.{mockDao,TestController,TestModel,TestUpdate}
+    import CrudControllerTest.{mockDao,TestController,TestModel,TestResource}
 
     "CrudController#getAll()" should {
         when(mockDao.readAll) thenReturn Seq(TestModel(1,"ONE","1"),TestModel(2,"TWO","2"),TestModel(3,"THREE","3"))
@@ -44,9 +48,8 @@ class CrudControllerTest extends ControllerTest with MockitoSugar {
         }
         
         "respond with all items in the table as JSON" in {
-            contentAsJson(result).toString mustBe (
+            contentAsJson(result).toString mustBe
                     """[{"id":1,"name":"ONE","value":"1"},{"id":2,"name":"TWO","value":"2"},{"id":3,"name":"THREE","value":"3"}]"""
-            )
         }
     }
 
@@ -74,7 +77,7 @@ class CrudControllerTest extends ControllerTest with MockitoSugar {
             Json.parse("""{"value":"THIS IS A NEW RECORD","name":"name"}""")
         )
 
-        when(mockDao.create(isA(classOf[TestUpdate]))) thenReturn Some(TestModel(3,"name","THIS IS A NEW RECORD"))
+        when(mockDao.create(isA(classOf[TestResource]))) thenReturn Some(TestModel(3,"name","THIS IS A NEW RECORD"))
 
         val result = TestController.post().apply(request)
 
@@ -86,7 +89,7 @@ class CrudControllerTest extends ControllerTest with MockitoSugar {
             contentAsJson(result).toString mustBe """{"id":3,"name":"name","value":"THIS IS A NEW RECORD"}"""
         }
 
-        when(mockDao.create(isA(classOf[TestUpdate]))) thenReturn None
+        when(mockDao.create(isA(classOf[TestResource]))) thenReturn None
 
         request = FakeRequest("POST","/").withBody(Json.parse("""{"value":"I HAVE NO NAME"}"""))
         val result2 = TestController.post().apply(request)
@@ -108,7 +111,7 @@ class CrudControllerTest extends ControllerTest with MockitoSugar {
             Json.parse("""{"name":"numero dos","value":"VAL"}""")        
         )
 
-        when(mockDao.update(anyLong(),isA(classOf[Update[TestModel]]))) thenReturn Some(TestModel(2,"numero dos","VAL"))
+        when(mockDao.update(anyLong(),isA(classOf[Resource[TestModel]]))) thenReturn Some(TestModel(2,"numero dos","VAL"))
 
         val response = TestController.put(2).apply(request)
         "respond with a status 200 when successful" in {
@@ -119,7 +122,7 @@ class CrudControllerTest extends ControllerTest with MockitoSugar {
             contentAsJson(response).toString mustBe """{"id":2,"name":"numero dos","value":"VAL"}"""
         }
 
-        when(mockDao.update(anyLong,isA(classOf[Update[TestModel]]))) thenReturn None
+        when(mockDao.update(anyLong,isA(classOf[Resource[TestModel]]))) thenReturn None
 
         val response2 = TestController.put(4).apply(request)
         "respond with status 404 if the specified id is not available" in {

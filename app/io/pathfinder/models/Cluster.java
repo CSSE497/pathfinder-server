@@ -29,9 +29,9 @@ public class Cluster extends Model {
   @OneToMany(mappedBy="parent", cascade = CascadeType.ALL)
   public List<Cluster> subClusters;
 
-  @OneToMany(cascade = CascadeType.ALL)
+  /*@OneToMany(cascade = CascadeType.ALL)
   public List<Vehicle> vehicles;
-
+*/
   @OneToMany(mappedBy="parent", cascade = CascadeType.ALL)
   public List<Commodity> commodities;
 

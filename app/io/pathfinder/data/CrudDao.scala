@@ -3,16 +3,6 @@ package io.pathfinder.data
 abstract class CrudDao[K,M] {
 
     /**
-     *  returns the default model should only constructs it, not save it
-     */
-    def construct: M
-
-    /**
-     * Creates, saves, and returns a default model
-     */
-    final def create: M = create(construct)
-
-    /**
      * Adds the specified model to the database
      */
     def create(model: M): M

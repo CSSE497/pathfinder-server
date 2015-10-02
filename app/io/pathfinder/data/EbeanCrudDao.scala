@@ -11,12 +11,13 @@ abstract class EbeanCrudDao[K,M <: Model](finder: Model.Find[K,M]) extends CrudD
         model
     }
 
-    final def create(create: Resource[M]): Option[M] =
+    final def create(create: Resource[M]): Option[M] = {
         create.create().map {
             model =>
                 model.insert()
                 model
         }
+    }
 
     @Transactional
     final override def update(id: K, update: Resource[M]): Option[M] = for {

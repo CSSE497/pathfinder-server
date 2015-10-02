@@ -2,7 +2,6 @@ package io.pathfinder.models
 
 import com.avaje.ebean.Model
 import javax.persistence._
-import io.pathfinder.websockets.{ModelType, WebSocketDao}
 import play.api.libs.json.{Format,Json}
 import io.pathfinder.data.{Resource,EbeanCrudDao}
 
@@ -10,9 +9,7 @@ object Vehicle {
 
     val finder: Model.Find[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
 
-    object Dao extends EbeanCrudDao[Long,Vehicle](finder) {
-        override def construct = new Vehicle
-    }
+    object Dao extends EbeanCrudDao[Long,Vehicle](finder)
 
     implicit val format: Format[Vehicle] = Json.format[Vehicle]
 
@@ -30,15 +27,25 @@ object Vehicle {
             Some(v)
         }
 
-        override def create(): Option[Vehicle] = for {
-            lat <- latitude
-            lng <- longitude
-            cap <- capacity
-        } yield Vehicle(0,lat,lng,cap)
+        override def create(): Option[Vehicle] = {
+            for {
+                lat <- latitude
+                lng <- longitude
+                cap <- capacity
+            } yield {
+                Vehicle(0,lat,lng,cap)
+            }
+        }
     }
 
-    def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle =
-        apply(id, latitude, longitude, capacity)
+    def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle = {
+        val v = new Vehicle
+        v.id = id
+        v.latitude = latitude
+        v.longitude = longitude
+        v.capacity = capacity
+        v
+    }
 
     def unapply(v: Vehicle): Option[(Long, Double, Double, Int)] = Some((v.id, v.latitude, v.longitude, v.capacity))
 }
@@ -47,7 +54,7 @@ object Vehicle {
 class Vehicle() extends Model {
 
     @Id
-    @Column(name = "id", nullable = false)
+    @Column(nullable = false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0
 

@@ -1,7 +1,7 @@
 package io.pathfinder.controllers
 
 import io.pathfinder.websockets.{WebSocketActor, WebSocketMessage}
-import play.api.mvc.{WebSocket, Controller, Action}
+import play.api.mvc.{WebSocket, Controller}
 
 class Application extends Controller {
   import io.pathfinder.websockets.WebSocketMessage.frameFormat
