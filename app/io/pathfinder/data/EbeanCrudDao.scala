@@ -11,23 +11,21 @@ abstract class EbeanCrudDao[K,M <: Model](finder: Model.Find[K,M]) extends CrudD
         model
     }
 
-    final def create(update: Update[M]): Option[M] = {
-        val model = construct
-        if(update(model)){
-            Some(create(model))
-        } else {
-            None
-        }
-    }
-
-    @Transactional
-    final override def update(id: K, update: Update[M]): Option[M] =
-        Option(finder.byId(id)).map{
+    final def create(create: Resource[M]): Option[M] =
+        create.create().map {
             model =>
-                update(model)
-                model.save()
+                model.insert()
                 model
         }
+
+    @Transactional
+    final override def update(id: K, update: Resource[M]): Option[M] = for {
+        model   <- Option(finder.byId(id))
+        updated <- update.update(model)
+    } yield {
+        updated.save()
+        updated
+    }
 
     final override def update(model: M): Option[M] = {
         model.update()

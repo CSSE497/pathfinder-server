@@ -5,7 +5,7 @@ abstract class CrudDao[K,M] {
     /**
      *  returns the default model should only constructs it, not save it
      */
-    protected def construct: M
+    def construct: M
 
     /**
      * Creates, saves, and returns a default model
@@ -18,16 +18,16 @@ abstract class CrudDao[K,M] {
     def create(model: M): M
 
     /**
-     * Creates a model according to the specified update, if the update returns
+     * Creates a model according to the specified resource, if the update returns
      * false, no model is created in the database and None is returned
      */
-    def create(update: Update[M]): Option[M]
+    def create(create: Resource[M]): Option[M]
 
     /**
-     * applies the update to the model with the given id,
+     * applies the resource as an update to the model with the given id,
      * returns the model if it exists, otherwise returns None
      */
-    def update(id: K, update: Update[M]): Option[M]
+    def update(id: K, update: Resource[M]): Option[M]
 
     /**
      * updates the specified model
