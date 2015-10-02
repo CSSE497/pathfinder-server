@@ -8,9 +8,9 @@ import io.pathfinder.data.{Update,EbeanCrudDao}
 
 object Vehicle {
 
-    val finder: Model.Finder[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
+    val finder: Model.Find[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
 
-    object Dao extends EbeanCrudDao[Long,Vehicle,Model.Finder[Long,Vehicle]](finder){
+    object Dao extends EbeanCrudDao[Long,Vehicle](finder){
         override def construct = new Vehicle
     }
 
