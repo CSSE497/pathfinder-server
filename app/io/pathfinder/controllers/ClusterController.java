@@ -8,6 +8,8 @@ import play.libs.Json;
 import play.mvc.Controller;
 import io.pathfinder.models.Cluster;
 import play.mvc.Result;
+import play.mvc.Security;
+
 import java.util.Iterator;
 
 import javax.persistence.PersistenceException;
@@ -19,6 +21,7 @@ public class ClusterController extends Controller {
         return ok(jsonContext.toJson(Cluster.find.all()));
     }
 
+    @Security.Authenticated(ClusterAuthenticator.class)
     public Result getCluster(long id) {
         Cluster cluster = Cluster.find.byId(id);
 
@@ -29,6 +32,7 @@ public class ClusterController extends Controller {
         return ok(jsonContext.toJson(cluster));
     }
 
+    @Security.Authenticated(ClusterAuthenticator.class)
     public Result createCluster() {
         JsonNode json = request().body().asJson();
         if (json == null) {
@@ -49,6 +53,7 @@ public class ClusterController extends Controller {
         }
     }
 
+    @Security.Authenticated(ClusterAuthenticator.class)
     public Result editCluster(long id) {
         Cluster cluster = Cluster.find.byId(id);
 
@@ -90,6 +95,7 @@ public class ClusterController extends Controller {
         }
     }
 
+    @Security.Authenticated(ClusterAuthenticator.class)
     public Result deleteCluster(long id) {
         Cluster cluster = Cluster.find.byId(id);
 
