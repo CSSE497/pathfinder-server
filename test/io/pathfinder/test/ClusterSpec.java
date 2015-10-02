@@ -3,6 +3,7 @@ package io.pathfinder.test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Commodity;
 import io.pathfinder.models.Vehicle;
 import play.libs.Json;
@@ -20,13 +21,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
 
+import scala.collection.JavaConversions;
+
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.pathfinder.models.Cluster;
-
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -69,17 +70,22 @@ public class ClusterSpec {
     public Commodity createCommodity() {
         Commodity commodity = new Commodity();
         Random rand = new Random();
-
-        commodity.startLatitude = rand.nextDouble();
-        commodity.endLatitude = rand.nextDouble();
-        commodity.startLongitude = rand.nextDouble();
-        commodity.endLongitude = rand.nextDouble();
-        commodity.param = rand.nextInt();
-
+        commodity.apply(1, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextInt(), 0);
         return commodity;
     }
 
+    private static <T> scala.collection.immutable.List<T> newList() {
+        return wrap(new LinkedList<T>());
+    }
+
+    private static <T> scala.collection.immutable.List<T> wrap(List<T> list) {
+        return (JavaConversions.asScalaBuffer(list)).toList();
+    }
+
     public Cluster createClusters() {
+        Commodity commodity1 = createCommodity();
+        Commodity commodity2 = createCommodity();
+        Commodity commodity3 = createCommodity();
         Cluster mainCluster = new Cluster();
         Cluster cluster1 = new Cluster();
         Cluster cluster2 = new Cluster();
@@ -90,28 +96,16 @@ public class ClusterSpec {
         Vehicle vehicle2 = createVehicle(1);
         Vehicle vehicle3 = createVehicle(2);
 
-        Commodity commodity1 = createCommodity();
-        Commodity commodity2 = createCommodity();
-        Commodity commodity3 = createCommodity();
+        cluster1.parent_$eq(mainCluster);
+        cluster4.parent_$eq(mainCluster);
+        cluster2.parent_$eq(cluster1);
+        cluster3.parent_$eq(cluster3);
 
-        cluster1.parent = mainCluster;
-        cluster4.parent = mainCluster;
-        cluster2.parent = cluster1;
-        cluster3.parent = cluster2;
-
-        mainCluster.subClusters.add(cluster1);
-        mainCluster.subClusters.add(cluster4);
-        cluster1.subClusters.add(cluster2);
-        cluster2.subClusters.add(cluster3);
-
-        mainCluster.vehicles.add(vehicle1);
-        cluster1.vehicles.add(vehicle2);
-        cluster2.vehicles.add(vehicle3);
-
-        mainCluster.commodities.add(commodity1);
-        cluster1.commodities.add(commodity2);
-        cluster2.commodities.add(commodity3);
-
+        mainCluster.apply(0, -1, wrap(Arrays.asList(cluster1, cluster4)), wrap(Arrays.asList(vehicle1)), wrap(Arrays.asList(commodity1)));
+        cluster1.apply(1, 0, wrap(Arrays.asList(cluster2)), wrap(Arrays.asList(vehicle2)), wrap(Arrays.asList(commodity2)));
+        cluster2.apply(2, 1, wrap(Arrays.asList(cluster3)), wrap(Arrays.asList(vehicle3)), wrap(Arrays.asList(commodity3)));
+        cluster3.apply(3, 2, newList(), newList(), newList());
+        cluster4.apply(4, 1, newList(), newList(), newList());
         return mainCluster;
     }
 
@@ -121,9 +115,9 @@ public class ClusterSpec {
 
         mainCluster.save();
 
-        assertEquals(5, Cluster.find.all().size());
+        assertEquals(5, Cluster.finder().all().size());
         assertEquals(3, Vehicle.finder().all().size());
-        assertEquals(3, Commodity.find.all().size());
+        assertEquals(3, Commodity.finder().all().size());
     }
 
     @Test
@@ -189,14 +183,7 @@ public class ClusterSpec {
             assertEquals("Get all clusters should return status 200", 200, result.status());
 
             ArrayNode resultJson = (ArrayNode) bodyForResult(result);
-            List<Cluster> clusters = new LinkedList<Cluster>();
-
-            for (int i = 0; i < resultJson.size(); i++) {
-                ObjectNode clusterNode = (ObjectNode) resultJson.get(i);
-                clusters.add(Json.fromJson(clusterNode, Cluster.class));
-            }
-
-            assertEquals("Should have returned five clusters", 5, clusters.size());
+            assertEquals("Should have returned five clusters", 5, resultJson.size());
         });
     }
 
@@ -240,7 +227,7 @@ public class ClusterSpec {
 
             ObjectNode body = JsonNodeFactory.instance.objectNode();
             Cluster newCluster = new Cluster();
-            newCluster.subClusters = new LinkedList<Cluster>();
+            newCluster.subClusters_$eq(newList());
             JsonNode newClusters = Json.toJson(newCluster);
 
             RequestBuilder request = new RequestBuilder()
@@ -251,8 +238,8 @@ public class ClusterSpec {
 
             assertEquals("Successful Put should return no content code", 204, result.status());
 
-            Cluster cluster = Cluster.find.byId(1L);
-            assertEquals("Commodity PUT changes should persist in the db", 0, cluster.subClusters.size());
+            Cluster cluster = Cluster.finder().byId(1L);
+            assertEquals("Commodity PUT changes should persist in the db", 0, cluster.subClusters().size());
 
             RequestBuilder invalidIdRequest = new RequestBuilder()
                     .method(Helpers.PUT)

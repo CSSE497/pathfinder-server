@@ -22,276 +22,258 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class CommoditySpec {
-  private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
-  private FakeApplication fakeApp;
+    private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
+    private FakeApplication fakeApp;
 
-  private JsonNode bodyForResult(Result r) {
-    String resultBody;
+    private JsonNode bodyForResult(Result r) {
+        String resultBody;
 
-    try {
-      resultBody = new String(JavaResultExtractor.getBody(r, 0L), "UTF-8");
+        try {
+            resultBody = new String(JavaResultExtractor.getBody(r, 0L), "UTF-8");
 
-      ObjectMapper mapper = new ObjectMapper();
-      return mapper.readTree(resultBody);
-    } catch(Exception e) {
-      fail("Could not process database record");
-      return null;
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readTree(resultBody);
+        } catch(Exception e) {
+            fail("Could not process database record");
+            return null;
+        }
     }
-  }
 
-  @Before
-  public void setup() {
-    fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase("default"));
-  }
+    @Before
+    public void setup() {
+        fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase("default"));
+    }
 
-  @After
-  public void teardown() {
-    Helpers.stop(fakeApp);
-  }
+    @After
+    public void teardown() {
+        Helpers.stop(fakeApp);
+    }
 
-  @Test
-  public void ebeanModelShouldBeValid() {
-    Commodity commodity = new Commodity();
+    @Test
+    public void ebeanModelShouldBeValid() {
+        Commodity commodity = new Commodity();
+        commodity.apply(1, 1.0, 1.0, 1.0, 1.0, 1, 1);
+        commodity.save();
+        assertEquals(1, Commodity.finder().all().size());
+    }
 
-    commodity.endLatitude = 1.0;
-    commodity.endLongitude = 1.0;
-    commodity.startLatitude = 1.0;
-    commodity.startLongitude = 1.0;
-    commodity.param = 1;
+    @Test
+    public void validPostShouldCreateCommodity() {
+        Helpers.running(fakeApp, () -> {
+            ObjectNode body = jsonNodeFactory.objectNode();
 
-    commodity.save();
+            body.put("startLatitude", 6.0);
+            body.put("startLongitude", 7.0);
+            body.put("endLatitude", 8.0);
+            body.put("endLongitude", 9.0);
 
-    assertEquals(1, Commodity.find.all().size());
-  }
+            RequestBuilder request = new RequestBuilder()
+                    .bodyJson(body)
+                    .header("Content-Type", "application/json")
+                    .method(Helpers.POST)
+                    .uri("/commodity");
 
-  @Test
-  public void validPostShouldCreateCommodity() {
-    Helpers.running(fakeApp, () -> {
-      ObjectNode body = jsonNodeFactory.objectNode();
+            Result result = Helpers.route(request);
 
-      body.put("startLatitude", 6.0);
-      body.put("startLongitude", 7.0);
-      body.put("endLatitude", 8.0);
-      body.put("endLongitude", 9.0);
+            // Check for 'Created' Status Code
+            assertEquals(201, result.status());
 
-      RequestBuilder request = new RequestBuilder()
-          .bodyJson(body)
-          .header("Content-Type", "application/json")
-          .method(Helpers.POST)
-          .uri("/commodity");
+            ObjectNode resultJson = (ObjectNode) bodyForResult(result);
 
-      Result result = Helpers.route(request);
+            // Ensure that all fields were correctly written to the database
+            assertTrue("db record should have startLatitude", resultJson.hasNonNull("startLatitude"));
+            assertTrue("db record should have startLongitude", resultJson.hasNonNull("startLongitude"));
+            assertTrue("db record should have endLatitude", resultJson.hasNonNull("endLatitude"));
+            assertTrue("db record should have endLongitude", resultJson.hasNonNull("endLongitude"));
 
-      // Check for 'Created' Status Code
-      assertEquals(201, result.status());
+            // Ensure that the correct values were written to the database
+            assertEquals("db record should have correct value for startLatitude",
+                    6.0, resultJson.findPath("startLatitude").asDouble(), .001);
+            assertEquals("db record should have correct value for startLongitude",
+                    7.0, resultJson.findPath("startLongitude").asDouble(), .001);
+            assertEquals("db record should have correct value for  endLatitude",
+                    8.0, resultJson.findPath("endLatitude").asDouble(), .001);
+            assertEquals("db record should have correct value for endLongitude",
+                    9.0, resultJson.findPath("endLongitude").asDouble(), .001);
 
-      ObjectNode resultJson = (ObjectNode) bodyForResult(result);
+        });
+    }
 
-      // Ensure that all fields were correctly written to the database
-      assertTrue("db record should have startLatitude", resultJson.hasNonNull("startLatitude"));
-      assertTrue("db record should have startLongitude", resultJson.hasNonNull("startLongitude"));
-      assertTrue("db record should have endLatitude", resultJson.hasNonNull("endLatitude"));
-      assertTrue("db record should have endLongitude", resultJson.hasNonNull("endLongitude"));
+    @Test
+    public void validPostShouldCreateCommodityWithParam() {
+        Helpers.running(fakeApp, () -> {
+            ObjectNode body = jsonNodeFactory.objectNode();
 
-      // Ensure that the correct values were written to the database
-      assertEquals("db record should have correct value for startLatitude",
-          6.0, resultJson.findPath("startLatitude").asDouble(), .001);
-      assertEquals("db record should have correct value for startLongitude",
-          7.0, resultJson.findPath("startLongitude").asDouble(), .001);
-      assertEquals("db record should have correct value for  endLatitude",
-          8.0, resultJson.findPath("endLatitude").asDouble(), .001);
-      assertEquals("db record should have correct value for endLongitude",
-          9.0, resultJson.findPath("endLongitude").asDouble(), .001);
+            body.put("startLatitude", 1.0);
+            body.put("startLongitude", 2.0);
+            body.put("endLatitude", 3.0);
+            body.put("endLongitude", 4.0);
+            body.put("param", 5);
 
-    });
-  }
+            RequestBuilder request = new RequestBuilder()
+                    .bodyJson(body)
+                    .header("Content-Type", "application/json")
+                    .method(Helpers.POST)
+                    .uri("/commodity");
 
-  @Test
-  public void validPostShouldCreateCommodityWithParam() {
-    Helpers.running(fakeApp, () -> {
-        ObjectNode body = jsonNodeFactory.objectNode();
+            Result result = Helpers.route(request);
+            assertEquals(201, result.status());
 
-        body.put("startLatitude", 1.0);
-        body.put("startLongitude", 2.0);
-        body.put("endLatitude", 3.0);
-        body.put("endLongitude", 4.0);
-        body.put("param", 5);
+            ObjectNode resultJson = (ObjectNode) bodyForResult(result);
 
-        RequestBuilder request = new RequestBuilder()
-            .bodyJson(body)
-            .header("Content-Type", "application/json")
-            .method(Helpers.POST)
-            .uri("/commodity");
+            // Ensure that all fields were correctly written to the database
+            assertTrue("db record should have startLatitude", resultJson.hasNonNull("startLatitude"));
+            assertTrue("db record should have startLongitude", resultJson.hasNonNull("startLongitude"));
+            assertTrue("db record should have endLatitude", resultJson.hasNonNull("endLatitude"));
+            assertTrue("db record should have endLongitude", resultJson.hasNonNull("endLongitude"));
+            assertTrue("db record should have param", resultJson.hasNonNull("param"));
 
-        Result result = Helpers.route(request);
-        assertEquals(201, result.status());
+            // Ensure that the correct values were written to the database
+            assertEquals("db record should have correct value for startLatitude",
+                    1.0, resultJson.findPath("startLatitude").asDouble(), .001);
+            assertEquals("db record should have correct value for startLongitude",
+                    2.0, resultJson.findPath("startLongitude").asDouble(), .001);
+            assertEquals("db record should have correct value for  endLatitude",
+                    3.0, resultJson.findPath("endLatitude").asDouble(), .001);
+            assertEquals("db record should have correct value for endLongitude",
+                    4.0, resultJson.findPath("endLongitude").asDouble(), .001);
+            assertEquals("db record should have correct value for param",
+                    5, resultJson.findPath("param").asInt());
+        });
+    }
 
-        ObjectNode resultJson = (ObjectNode) bodyForResult(result);
+    @Test
+    public void getShouldReturnAllCommodities() {
+        Helpers.running(fakeApp, () -> {
+            populateCommodities();
 
-        // Ensure that all fields were correctly written to the database
-        assertTrue("db record should have startLatitude", resultJson.hasNonNull("startLatitude"));
-        assertTrue("db record should have startLongitude", resultJson.hasNonNull("startLongitude"));
-        assertTrue("db record should have endLatitude", resultJson.hasNonNull("endLatitude"));
-        assertTrue("db record should have endLongitude", resultJson.hasNonNull("endLongitude"));
-        assertTrue("db record should have param", resultJson.hasNonNull("param"));
+            RequestBuilder request = new RequestBuilder()
+                    .method(Helpers.GET)
+                    .uri("/commodity");
+            Result result = Helpers.route(request);
 
-        // Ensure that the correct values were written to the database
-        assertEquals("db record should have correct value for startLatitude",
-            1.0, resultJson.findPath("startLatitude").asDouble(), .001);
-        assertEquals("db record should have correct value for startLongitude",
-            2.0, resultJson.findPath("startLongitude").asDouble(), .001);
-        assertEquals("db record should have correct value for  endLatitude",
-            3.0, resultJson.findPath("endLatitude").asDouble(), .001);
-        assertEquals("db record should have correct value for endLongitude",
-            4.0, resultJson.findPath("endLongitude").asDouble(), .001);
-        assertEquals("db record should have correct value for param",
-            5, resultJson.findPath("param").asInt());
-      });
-  }
+            assertEquals("Get all commodities should return status 200", 200, result.status());
 
-  @Test
-  public void getShouldReturnAllCommodities() {
-    Helpers.running(fakeApp, () -> {
-      populateCommodities();
+            ArrayNode resultJson = (ArrayNode) bodyForResult(result);
+            List<Commodity> commodities = new LinkedList<Commodity>();
 
-      RequestBuilder request = new RequestBuilder()
-          .method(Helpers.GET)
-          .uri("/commodity");
-      Result result = Helpers.route(request);
+            for (int i = 0; i < resultJson.size(); i++) {
+                ObjectNode commodityNode = (ObjectNode) resultJson.get(i);
+                commodities.add(Json.fromJson(commodityNode, Commodity.class));
+            }
 
-      assertEquals("Get all commodities should return status 200", 200, result.status());
+            assertEquals("Should have returned two commodities", 2, commodities.size());
+            assertEquals("Should have correct values in first commodity", 3.0, commodities.get(0).endLatitude(), .001);
+        });
+    }
 
-      ArrayNode resultJson = (ArrayNode) bodyForResult(result);
-      List<Commodity> commodities = new LinkedList<Commodity>();
+    private void populateCommodities() {
+        Commodity commodity1 = new Commodity();
+        commodity1.apply(1, 1.0, 2.0, 3.0, 4.0, 1, 5);
+        Commodity commodity2 = new Commodity();
+        commodity2.apply(2, 10.0, 20.0, 30.0, 40.0, 1, 50);
+        commodity1.save();
+        commodity2.save();
+    }
 
-      for (int i = 0; i < resultJson.size(); i++) {
-        ObjectNode commodityNode = (ObjectNode) resultJson.get(i);
-        commodities.add(Json.fromJson(commodityNode, Commodity.class));
-      }
+    @Test
+    public void getByExistingIDShouldReturnCommodity() {
+        Helpers.running(fakeApp, () -> {
+            populateCommodities();
 
-      assertEquals("Should have returned two commodities", 2, commodities.size());
-      assertEquals("Should have correct values in first commodity", 3.0, commodities.get(0).endLatitude, .001);
-    });
-  }
+            RequestBuilder request = new RequestBuilder()
+                    .method(Helpers.GET)
+                    .uri("/commodity/1");
+            Result result = Helpers.route(request);
 
-  private void populateCommodities() {
-    Commodity commodity1 = new Commodity();
-    Commodity commodity2 = new Commodity();
+            assertEquals("Get commodity by id should return status 200", 200, result.status());
 
-    commodity1.startLatitude = 1.0;
-    commodity1.startLongitude = 2.0;
-    commodity1.endLatitude = 3.0;
-    commodity1.endLongitude = 4.0;
-    commodity1.param = 5;
+            ObjectNode resultJson = (ObjectNode) bodyForResult(result);
+            Commodity commodity = Json.fromJson(resultJson, Commodity.class);
 
-    commodity2.startLatitude = 10.0;
-    commodity2.startLongitude = 20.0;
-    commodity2.endLatitude = 30.0;
-    commodity2.endLongitude = 40.0;
-    commodity2.param = 50;
+            assertNotNull("Get by id should return a result", commodity);
+            assertEquals("Get by id should return correct commodity", 1.0, commodity.startLatitude(), .001);
+        });
+    }
 
-    commodity1.save();
-    commodity2.save();
-  }
+    @Test
+    public void getByInvalidIdShouldReturnNotFound() {
+        Helpers.running(fakeApp, () -> {
+            populateCommodities();
 
-  @Test
-  public void getByExistingIDShouldReturnCommodity() {
-    Helpers.running(fakeApp, () -> {
-      populateCommodities();
+            RequestBuilder request = new RequestBuilder()
+                    .method(Helpers.GET)
+                    .uri("/commodity/100");
+            Result result = Helpers.route(request);
 
-      RequestBuilder request = new RequestBuilder()
-          .method(Helpers.GET)
-          .uri("/commodity/1");
-      Result result = Helpers.route(request);
+            assertEquals("Get by invalid should return status 404", 404, result.status());
+        });
+    }
 
-      assertEquals("Get commodity by id should return status 200", 200, result.status());
+    @Test
+    public void putShouldUpdateCommodity() {
+        Helpers.running(fakeApp, () -> {
+            populateCommodities();
 
-      ObjectNode resultJson = (ObjectNode) bodyForResult(result);
-      Commodity commodity = Json.fromJson(resultJson, Commodity.class);
+            ObjectNode body = JsonNodeFactory.instance.objectNode();
+            body.put("startLatitude", 500.0);
 
-      assertNotNull("Get by id should return a result", commodity);
-      assertEquals("Get by id should return correct commodity", 1.0, commodity.startLatitude, .001);
-    });
-  }
+            RequestBuilder request = new RequestBuilder()
+                    .method(Helpers.PUT)
+                    .uri("/commodity/1")
+                    .bodyJson(body);
+            Result result = Helpers.route(request);
 
-  @Test
-  public void getByInvalidIdShouldReturnNotFound() {
-    Helpers.running(fakeApp, () -> {
-      populateCommodities();
+            assertEquals("Successful Put should return no content code", 204, result.status());
 
-      RequestBuilder request = new RequestBuilder()
-          .method(Helpers.GET)
-          .uri("/commodity/100");
-      Result result = Helpers.route(request);
+            Commodity commodity = Commodity.finder().byId(1L);
+            assertEquals("Commodity PUT changes should persist in the db", 500.0, commodity.startLatitude(), .001);
 
-      assertEquals("Get by invalid should return status 404", 404, result.status());
-    });
-  }
+            RequestBuilder invalidIdRequest = new RequestBuilder()
+                    .method(Helpers.PUT)
+                    .uri("/commodity/500")
+                    .bodyJson(body);
+            Result invalidIdResult = Helpers.route(invalidIdRequest);
+            assertEquals("Put to invalid id should 404", 404, invalidIdResult.status());
 
-  @Test
-  public void putShouldUpdateCommodity() {
-    Helpers.running(fakeApp, () -> {
-      populateCommodities();
+            // Test Put with fake fields
+            body.put("FAKE FIELD", 25);
 
-      ObjectNode body = JsonNodeFactory.instance.objectNode();
-      body.put("startLatitude", 500.0);
-
-      RequestBuilder request = new RequestBuilder()
-          .method(Helpers.PUT)
-          .uri("/commodity/1")
-          .bodyJson(body);
-      Result result = Helpers.route(request);
-
-      assertEquals("Successful Put should return no content code", 204, result.status());
-
-      Commodity commodity = Commodity.find.byId(1L);
-      assertEquals("Commodity PUT changes should persist in the db", 500.0, commodity.startLatitude, .001);
-
-      RequestBuilder invalidIdRequest = new RequestBuilder()
-          .method(Helpers.PUT)
-          .uri("/commodity/500")
-          .bodyJson(body);
-      Result invalidIdResult = Helpers.route(invalidIdRequest);
-      assertEquals("Put to invalid id should 404", 404, invalidIdResult.status());
-
-      // Test Put with fake fields
-      body.put("FAKE FIELD", 25);
-
-      RequestBuilder fakeFieldRequest = new RequestBuilder()
-          .method(Helpers.PUT)
-          .uri("/commodity/1")
-          .bodyJson(body);
-      Result fakeFieldResult = Helpers.route(fakeFieldRequest);
+            RequestBuilder fakeFieldRequest = new RequestBuilder()
+                    .method(Helpers.PUT)
+                    .uri("/commodity/1")
+                    .bodyJson(body);
+            Result fakeFieldResult = Helpers.route(fakeFieldRequest);
 //      assertEquals("Invalid PUT body should return bad request", 400, fakeFieldResult.status());
-    });
-  }
+        });
+    }
 
-  @Test
-  public void deleteShouldDeleteCommodity() {
-    Helpers.running(fakeApp, () -> {
-      populateCommodities();
+    @Test
+    public void deleteShouldDeleteCommodity() {
+        Helpers.running(fakeApp, () -> {
+            populateCommodities();
 
-      RequestBuilder deleteRequest = new RequestBuilder()
-          .method(Helpers.DELETE)
-          .uri("/commodity/1");
-      Result deleteResult = Helpers.route(deleteRequest);
+            RequestBuilder deleteRequest = new RequestBuilder()
+                    .method(Helpers.DELETE)
+                    .uri("/commodity/1");
+            Result deleteResult = Helpers.route(deleteRequest);
 
-      assertEquals("valid DELETE commodity request should return status 200", 200, deleteResult.status());
+            assertEquals("valid DELETE commodity request should return status 200", 200, deleteResult.status());
 
-      RequestBuilder getRequest = new RequestBuilder()
-          .method(Helpers.GET)
-          .uri("/commodity/1");
-      Result getResult = Helpers.route(getRequest);
+            RequestBuilder getRequest = new RequestBuilder()
+                    .method(Helpers.GET)
+                    .uri("/commodity/1");
+            Result getResult = Helpers.route(getRequest);
 
-      assertEquals("GET req for deleted item should 404", 404, getResult.status());
+            assertEquals("GET req for deleted item should 404", 404, getResult.status());
 
-      RequestBuilder deleteFakeRequest = new RequestBuilder()
-          .method(Helpers.DELETE)
-          .uri("/commodity/500");
-      Result deleteFakeResult = Helpers.route(deleteFakeRequest);
+            RequestBuilder deleteFakeRequest = new RequestBuilder()
+                    .method(Helpers.DELETE)
+                    .uri("/commodity/500");
+            Result deleteFakeResult = Helpers.route(deleteFakeRequest);
 
-      assertEquals("Deleting nonexistent commodity should return 404", 404, deleteFakeResult.status());
-    });
-  }
+            assertEquals("Deleting nonexistent commodity should return 404", 404, deleteFakeResult.status());
+        });
+    }
 
 }

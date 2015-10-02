@@ -18,11 +18,11 @@ public class CommodityController extends Controller {
   private JsonContext jsonContext = Ebean.createJsonContext();
 
   public Result getCommodities() {
-    return ok(jsonContext.toJson(Commodity.find.all()));
+    return ok(jsonContext.toJson(Commodity.finder().all()));
   }
 
   public Result getCommodity(long id) {
-    Commodity commodity = Commodity.find.byId(id);
+    Commodity commodity = Commodity.finder().byId(id);
 
     if (commodity == null) {
       return notFound();
@@ -52,7 +52,7 @@ public class CommodityController extends Controller {
   }
 
   public Result editCommodity(long id) {
-    Commodity commodity = Commodity.find.byId(id);
+    Commodity commodity = Commodity.finder().byId(id);
 
     if (commodity == null) {
       return notFound();
@@ -91,7 +91,7 @@ public class CommodityController extends Controller {
   }
 
   public Result deleteCommodity(long id) {
-    Commodity commodity = Commodity.find.byId(id);
+    Commodity commodity = Commodity.finder().byId(id);
 
     if (commodity == null) {
       return notFound();

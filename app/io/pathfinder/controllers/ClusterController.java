@@ -4,9 +4,9 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.pathfinder.models.Cluster;
 import play.libs.Json;
 import play.mvc.Controller;
-import io.pathfinder.models.Cluster;
 import play.mvc.Result;
 import java.util.Iterator;
 
@@ -16,11 +16,11 @@ public class ClusterController extends Controller {
     private JsonContext jsonContext = Ebean.createJsonContext();
 
     public Result getClusters() {
-        return ok(jsonContext.toJson(Cluster.find.all()));
+        return ok(jsonContext.toJson(Cluster.finder().all()));
     }
 
     public Result getCluster(long id) {
-        Cluster cluster = Cluster.find.byId(id);
+        Cluster cluster = Cluster.finder().byId(id);
 
         if (cluster == null) {
             return notFound();
@@ -50,7 +50,7 @@ public class ClusterController extends Controller {
     }
 
     public Result editCluster(long id) {
-        Cluster cluster = Cluster.find.byId(id);
+        Cluster cluster = Cluster.finder().byId(id);
 
         if (cluster == null) {
             return notFound();
@@ -91,7 +91,7 @@ public class ClusterController extends Controller {
     }
 
     public Result deleteCluster(long id) {
-        Cluster cluster = Cluster.find.byId(id);
+        Cluster cluster = Cluster.finder().byId(id);
 
         if (cluster == null) {
             return notFound();
