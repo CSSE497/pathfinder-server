@@ -4,12 +4,13 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import play.Logger;
 import play.mvc.Controller;
 import io.pathfinder.models.Commodity;
 import play.mvc.Result;
 
 import java.util.Iterator;
-import play.libs.Json;
+import play.api.libs.json.Json;
 
 import javax.persistence.PersistenceException;
 
@@ -28,7 +29,7 @@ public class CommodityController extends Controller {
       return notFound();
     }
 
-    return ok(jsonContext.toJson(commodity));
+    return ok(Commodity.format().writes(commodity).toString());
   }
 
   public Result createCommodity() {
@@ -36,58 +37,26 @@ public class CommodityController extends Controller {
     if (json == null) {
       return badRequest("Expecting content-type text/json or application/json");
     }
-
-    Commodity commodity;
-
+    Logger.info(String.format("Create commodity request: %s", json.toString()));
     try {
-      commodity = Json.fromJson(json, Commodity.class);
+      Commodity commodity = Commodity.resourceFormat().reads(Json.parse(json.toString())).get().create().get();
       commodity.save();
-
-      return created(jsonContext.toJson(commodity));
+      return created(Commodity.format().writes(commodity).toString());
     } catch (PersistenceException e) {
+      e.printStackTrace();
       return internalServerError("Error saving commodity to the database: " + e.getMessage());
     } catch (Exception e) {
-      return badRequest("Unable to map json to commodity object: " + e.getMessage());
+      e.printStackTrace();
+      return badRequest("Unable to map json to commodity object: " + json.toString());
     }
   }
 
   public Result editCommodity(long id) {
     Commodity commodity = Commodity.finder().byId(id);
-
-    if (commodity == null) {
-      return notFound();
-    }
-
-    ObjectNode commodityJson = (ObjectNode) Json.toJson(commodity);
-    ObjectNode body;
-
-    try {
-      body = (ObjectNode) request().body().asJson();
-    } catch (ClassCastException e) {
-      return badRequest("Cannot cast request body to ObjectNode: " + e.getMessage());
-    }
-
-    Iterator<String> fields = commodityJson.fieldNames();
-    while (fields.hasNext()) {
-      String field = fields.next();
-
-      if (field.equals("id")) {
-        continue;
-      }
-
-      if (body.has(field)) {
-        commodityJson.replace(field, body.findPath(field));
-      }
-    }
-
-    try {
-      commodity = Json.fromJson(commodityJson, Commodity.class);
-      commodity.update();
-
-      return noContent();
-    } catch (Exception e) {
-      return badRequest("Unable to update commodity: " + e.getMessage());
-    }
+    if (commodity == null) return notFound();
+    Commodity.resourceFormat().reads(Json.parse(request().body().asJson().toString())).get().update(commodity);
+    commodity.save();
+    return noContent();
   }
 
   public Result deleteCommodity(long id) {

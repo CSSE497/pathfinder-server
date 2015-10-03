@@ -22,7 +22,6 @@ create table commodity (
 
 create table vehicle (
   id                        bigint auto_increment not null,
-  cluster_id                bigint not null,
   latitude                  double not null,
   longitude                 double not null,
   capacity                  integer not null,
@@ -33,8 +32,6 @@ alter table cluster add constraint fk_cluster_parent_1 foreign key (parent_id) r
 create index ix_cluster_parent_1 on cluster (parent_id);
 alter table commodity add constraint fk_commodity_parent_2 foreign key (parent_id) references cluster (id) on delete restrict on update restrict;
 create index ix_commodity_parent_2 on commodity (parent_id);
-alter table vehicle add constraint fk_vehicle_cluster_3 foreign key (cluster_id) references cluster (id) on delete restrict on update restrict;
-create index ix_vehicle_cluster_3 on vehicle (cluster_id);
 
 
 

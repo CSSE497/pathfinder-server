@@ -19,7 +19,6 @@ object Commodity {
         endLatitude: Option[Double],
         startLongitude:  Option[Double],
         endLongitude: Option[Double],
-        parentId: Option[Long],
         param:  Option[Int]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
@@ -27,7 +26,6 @@ object Commodity {
             startLongitude.foreach(c.startLongitude = _)
             endLatitude.foreach(c.endLatitude = _)
             endLongitude.foreach(c.endLongitude = _)
-            parentId.foreach { id => c.parent = Cluster.finder.byId(id) }
             param.foreach(c.param  = _)
             Some(c)
         }
@@ -38,30 +36,27 @@ object Commodity {
                 startLongitude <- startLongitude
                 endLatitude <- endLatitude
                 endLongitude <- endLongitude
-                parentId <- parentId
                 param <- param
             } yield {
-                Commodity(0, startLatitude, startLongitude, endLatitude, endLongitude, parentId, param)
+                Commodity(0, startLatitude, startLongitude, endLatitude, endLongitude, param)
             }
         }
     }
 
     def apply(id: Long, startLatitude: Double, startLongitude: Double, endLatitude: Double,
-              endLongitude: Double, parentId: Long, param: Int): Commodity = {
+              endLongitude: Double, param: Int): Commodity = {
         val c = new Commodity
         c.id = id
         c.startLatitude = startLatitude
         c.startLongitude = startLongitude
         c.endLatitude = endLatitude
         c.endLongitude = endLongitude
-        c.parent = Cluster.finder.byId(parentId)
         c.param = param
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, Long, Int)] =
-        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude,
-            (if (c.parent != null) c.parent.id else null).asInstanceOf[Long], c.param))
+    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, Int)] =
+        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.param))
 }
 
 @Entity
@@ -82,10 +77,6 @@ class Commodity() extends Model {
 
     @Column(name="endLongitude", nullable=false)
     var endLongitude: Double = 0
-
-    @JsonIgnore
-    @ManyToOne
-    var parent: Cluster = null
 
     @Column(name = "param")
     var param: Int = 0

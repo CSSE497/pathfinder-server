@@ -1,7 +1,6 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import play.libs.Json;
 import play.mvc.Result;
 import play.test.Helpers;
 import play.mvc.Http.RequestBuilder;
@@ -11,7 +10,10 @@ import play.core.j.JavaResultExtractor;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.Before;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -51,8 +53,7 @@ public class CommoditySpec {
 
     @Test
     public void ebeanModelShouldBeValid() {
-        Commodity commodity = new Commodity();
-        commodity.apply(1, 1.0, 1.0, 1.0, 1.0, 1, 1);
+        Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0, 1);
         commodity.save();
         assertEquals(1, Commodity.finder().all().size());
     }
@@ -66,6 +67,7 @@ public class CommoditySpec {
             body.put("startLongitude", 7.0);
             body.put("endLatitude", 8.0);
             body.put("endLongitude", 9.0);
+            body.put("param", 42);
 
             RequestBuilder request = new RequestBuilder()
                     .bodyJson(body)
@@ -155,11 +157,11 @@ public class CommoditySpec {
             assertEquals("Get all commodities should return status 200", 200, result.status());
 
             ArrayNode resultJson = (ArrayNode) bodyForResult(result);
-            List<Commodity> commodities = new LinkedList<Commodity>();
+            List<Commodity> commodities = new LinkedList<>();
 
             for (int i = 0; i < resultJson.size(); i++) {
                 ObjectNode commodityNode = (ObjectNode) resultJson.get(i);
-                commodities.add(Json.fromJson(commodityNode, Commodity.class));
+                commodities.add(Commodity.format().reads(play.api.libs.json.Json.parse(commodityNode.toString())).get());
             }
 
             assertEquals("Should have returned two commodities", 2, commodities.size());
@@ -168,10 +170,8 @@ public class CommoditySpec {
     }
 
     private void populateCommodities() {
-        Commodity commodity1 = new Commodity();
-        commodity1.apply(1, 1.0, 2.0, 3.0, 4.0, 1, 5);
-        Commodity commodity2 = new Commodity();
-        commodity2.apply(2, 10.0, 20.0, 30.0, 40.0, 1, 50);
+        Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, 5);
+        Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, 50);
         commodity1.save();
         commodity2.save();
     }
@@ -189,7 +189,7 @@ public class CommoditySpec {
             assertEquals("Get commodity by id should return status 200", 200, result.status());
 
             ObjectNode resultJson = (ObjectNode) bodyForResult(result);
-            Commodity commodity = Json.fromJson(resultJson, Commodity.class);
+            Commodity commodity = Commodity.format().reads(play.api.libs.json.Json.parse(resultJson.toString())).get();
 
             assertNotNull("Get by id should return a result", commodity);
             assertEquals("Get by id should return correct commodity", 1.0, commodity.startLatitude(), .001);
@@ -244,7 +244,6 @@ public class CommoditySpec {
                     .uri("/commodity/1")
                     .bodyJson(body);
             Result fakeFieldResult = Helpers.route(fakeFieldRequest);
-//      assertEquals("Invalid PUT body should return bad request", 400, fakeFieldResult.status());
         });
     }
 
