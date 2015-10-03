@@ -1,8 +1,10 @@
 package io.pathfinder.test;
 
+import akka.util.Timeout;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Commodity;
 import io.pathfinder.models.Vehicle;
 import play.libs.Json;
@@ -20,13 +22,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
 
+import scala.collection.JavaConversions;
+
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import io.pathfinder.models.Cluster;
+import scalaz.concurrent.Future;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -49,6 +52,8 @@ public class ClusterSpec {
         }
     }
 
+    static int id_count = 1;
+
     @Before
     public void setup() {
         fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase("default"));
@@ -59,71 +64,58 @@ public class ClusterSpec {
         Helpers.stop(fakeApp);
     }
 
-    public Vehicle createVehicle(long id) {
-        Vehicle vehicle = new Vehicle();
+    public Vehicle createVehicle() {
         Random rand = new Random();
-
-        return vehicle.apply(id, rand.nextDouble(), rand.nextDouble(), rand.nextInt());
+        return Vehicle.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextInt());
     }
 
     public Commodity createCommodity() {
-        Commodity commodity = new Commodity();
         Random rand = new Random();
+        return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), 0);
+    }
 
-        commodity.startLatitude = rand.nextDouble();
-        commodity.endLatitude = rand.nextDouble();
-        commodity.startLongitude = rand.nextDouble();
-        commodity.endLongitude = rand.nextDouble();
-        commodity.param = rand.nextInt();
+    private static <T> scala.collection.immutable.List<T> newList() {
+        return wrap(new LinkedList<T>());
+    }
 
-        return commodity;
+    private static <T> scala.collection.immutable.List<T> wrap(List<T> list) {
+        return (JavaConversions.<T>asScalaBuffer(list)).toList();
     }
 
     public Cluster createClusters() {
-        Cluster mainCluster = new Cluster();
-        Cluster cluster1 = new Cluster();
-        Cluster cluster2 = new Cluster();
-        Cluster cluster3 = new Cluster();
-        Cluster cluster4 = new Cluster();
-
-        Vehicle vehicle1 = createVehicle(0);
-        Vehicle vehicle2 = createVehicle(1);
-        Vehicle vehicle3 = createVehicle(2);
-
         Commodity commodity1 = createCommodity();
         Commodity commodity2 = createCommodity();
         Commodity commodity3 = createCommodity();
+        commodity1.save();
+        commodity2.save();
+        commodity3.save();
 
-        cluster1.parent = mainCluster;
-        cluster4.parent = mainCluster;
-        cluster2.parent = cluster1;
-        cluster3.parent = cluster2;
+        Vehicle vehicle1 = createVehicle();
+        Vehicle vehicle2 = createVehicle();
+        Vehicle vehicle3 = createVehicle();
+        vehicle1.save();
+        vehicle2.save();
+        vehicle3.save();
 
-        mainCluster.subClusters.add(cluster1);
-        mainCluster.subClusters.add(cluster4);
-        cluster1.subClusters.add(cluster2);
-        cluster2.subClusters.add(cluster3);
-
-        mainCluster.vehicles.add(vehicle1);
-        cluster1.vehicles.add(vehicle2);
-        cluster2.vehicles.add(vehicle3);
-
-        mainCluster.commodities.add(commodity1);
-        cluster1.commodities.add(commodity2);
-        cluster2.commodities.add(commodity3);
-
+        Cluster cluster4 = Cluster.apply(id_count++, newList(), newList(), newList());
+        cluster4.save();
+        Cluster cluster3 = Cluster.apply(id_count++, newList(), newList(), newList());
+        cluster3.save();
+        Cluster cluster2 = Cluster.apply(id_count++, wrap(Arrays.asList(cluster3.id())), wrap(Arrays.asList(vehicle3.id())), wrap(Arrays.asList(commodity3.id())));
+        cluster2.save();
+        Cluster cluster1 = Cluster.apply(id_count++, wrap(Arrays.asList(cluster2.id())), wrap(Arrays.asList(vehicle2.id())), wrap(Arrays.asList(commodity2.id())));
+        cluster1.save();
+        Cluster mainCluster = Cluster.apply(id_count++, wrap(Arrays.asList(cluster1.id(), cluster4.id())), newList(), newList());
+        mainCluster.save();
         return mainCluster;
     }
 
     @Test
     public void ebeanModelShouldBeValid() {
-        Cluster mainCluster = createClusters();
-
-        mainCluster.save();
-
-        assertEquals(5, Cluster.find.all().size());
+        createClusters();
+        assertEquals(5, Cluster.finder().all().size());
         assertEquals(3, Vehicle.finder().all().size());
-        assertEquals(3, Commodity.find.all().size());
+        assertEquals(3, Commodity.finder().all().size());
     }
 
     @Test
@@ -189,32 +181,23 @@ public class ClusterSpec {
             assertEquals("Get all clusters should return status 200", 200, result.status());
 
             ArrayNode resultJson = (ArrayNode) bodyForResult(result);
-            List<Cluster> clusters = new LinkedList<Cluster>();
-
-            for (int i = 0; i < resultJson.size(); i++) {
-                ObjectNode clusterNode = (ObjectNode) resultJson.get(i);
-                clusters.add(Json.fromJson(clusterNode, Cluster.class));
-            }
-
-            assertEquals("Should have returned five clusters", 5, clusters.size());
+            assertEquals("Should have returned five clusters", 5, resultJson.size());
         });
     }
 
     @Test
     public void getByExistingIDShouldReturnCluster() {
         Helpers.running(fakeApp, () -> {
-            createClusters().save();
+            long existingId = createClusters().id();
 
             RequestBuilder request = new RequestBuilder()
                     .method(Helpers.GET)
-                    .uri("/cluster/1");
+                    .uri("/cluster/"+String.valueOf(existingId));
             Result result = Helpers.route(request);
 
             assertEquals("Get cluster by id should return status 200", 200, result.status());
-
             ObjectNode resultJson = (ObjectNode) bodyForResult(result);
-            Cluster cluster = Json.fromJson(resultJson, Cluster.class);
-
+            Cluster cluster = Cluster.format().reads(play.api.libs.json.Json.parse(resultJson.toString())).get();
             assertNotNull("Get by id should return a result", cluster);
         });
     }
@@ -222,11 +205,11 @@ public class ClusterSpec {
     @Test
     public void getByInvalidIdShouldReturnNotFound() {
         Helpers.running(fakeApp, () -> {
-            createClusters().save();
+            createClusters();
 
             RequestBuilder request = new RequestBuilder()
                     .method(Helpers.GET)
-                    .uri("/cluster/100");
+                    .uri("/cluster/1000");
             Result result = Helpers.route(request);
 
             assertEquals("Get by invalid should return status 404", 404, result.status());
@@ -236,23 +219,23 @@ public class ClusterSpec {
     @Test
     public void putShouldUpdateClusters() {
         Helpers.running(fakeApp, () -> {
-            createClusters().save();
+            long existingId = createClusters().id();
 
             ObjectNode body = JsonNodeFactory.instance.objectNode();
             Cluster newCluster = new Cluster();
-            newCluster.subClusters = new LinkedList<Cluster>();
-            JsonNode newClusters = Json.toJson(newCluster);
+            newCluster.subClusters_$eq(newList());
+            JsonNode newClusters = Json.parse(Cluster.format().writes(newCluster).toString());
 
             RequestBuilder request = new RequestBuilder()
                     .method(Helpers.PUT)
-                    .uri("/cluster/1")
+                    .uri("/cluster/" + String.valueOf(existingId))
                     .bodyJson(newClusters);
             Result result = Helpers.route(request);
 
             assertEquals("Successful Put should return no content code", 204, result.status());
 
-            Cluster cluster = Cluster.find.byId(1L);
-            assertEquals("Commodity PUT changes should persist in the db", 0, cluster.subClusters.size());
+            Cluster cluster = Cluster.finder().byId(existingId);
+            assertEquals("Commodity PUT changes should persist in the db", 0, cluster.subClusters().size());
 
             RequestBuilder invalidIdRequest = new RequestBuilder()
                     .method(Helpers.PUT)
@@ -266,18 +249,18 @@ public class ClusterSpec {
     @Test
     public void deleteShouldDeleteCluster() {
         Helpers.running(fakeApp, () -> {
-            createClusters().save();
+            long existingId = createClusters().id();
 
             RequestBuilder deleteRequest = new RequestBuilder()
                     .method(Helpers.DELETE)
-                    .uri("/cluster/1");
+                    .uri("/cluster/" + String.valueOf(existingId));
             Result deleteResult = Helpers.route(deleteRequest);
 
             assertEquals("valid DELETE cluster request should return status 200", 200, deleteResult.status());
 
             RequestBuilder getRequest = new RequestBuilder()
                     .method(Helpers.GET)
-                    .uri("/cluster/1");
+                    .uri("/cluster/" + String.valueOf(existingId));
             Result getResult = Helpers.route(getRequest);
 
             assertEquals("GET req for deleted cluster should 404", 404, getResult.status());

@@ -4,11 +4,15 @@ import com.avaje.ebean.Ebean;
 import com.avaje.ebean.text.json.JsonContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.pathfinder.models.Cluster;
+import play.Logger;
+import play.api.libs.json.JsValue;
 import play.libs.Json;
 import play.mvc.Controller;
-import io.pathfinder.models.Cluster;
 import play.mvc.Result;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.persistence.PersistenceException;
 
@@ -16,41 +20,45 @@ public class ClusterController extends Controller {
     private JsonContext jsonContext = Ebean.createJsonContext();
 
     public Result getClusters() {
-        return ok(jsonContext.toJson(Cluster.find.all()));
+        List<String> jsObjs = Cluster.finder().all().stream().map(x -> Cluster.format().writes(x).toString()).collect(Collectors.toList());
+        return ok("[" + String.join(",", jsObjs) + "]");
     }
 
     public Result getCluster(long id) {
-        Cluster cluster = Cluster.find.byId(id);
+        Cluster cluster = Cluster.finder().byId(id);
 
         if (cluster == null) {
             return notFound();
         }
-
-        return ok(jsonContext.toJson(cluster));
+        return ok(Cluster.format().writes(cluster).toString());
     }
 
     public Result createCluster() {
-        JsonNode json = request().body().asJson();
-        if (json == null) {
+        Logger.info(String.format("Create request: %s", request().body().toString()));
+        JsValue jsVal = play.api.libs.json.Json.parse(request().body().asJson().toString());
+        if (jsVal == null) {
             return badRequest("Expected content-type text/json or application/json");
         }
 
         Cluster cluster;
 
         try {
-            cluster = Json.fromJson(json, Cluster.class);
-
+            cluster = Cluster.resourceFormat().reads(jsVal).get().create().get();
             cluster.save();
-            return created(jsonContext.toJson(cluster));
+            return created(Cluster.format().writes(cluster).toString());
         } catch (PersistenceException e) {
+            e.printStackTrace();
+            Logger.error(String.format("Error saving cluster to the database: %s", e.getMessage()));
             return internalServerError("Error saving cluster to the database: " + e.getMessage());
         } catch (RuntimeException e) {
-            return badRequest("Unable to map json to commodity object: " + e.getMessage());
+            e.printStackTrace();
+            Logger.error("Unable to map json to cluster object: " + jsVal.toString());
+            return badRequest("Unable to map json to cluster object: " + jsVal.toString());
         }
     }
 
     public Result editCluster(long id) {
-        Cluster cluster = Cluster.find.byId(id);
+        Cluster cluster = Cluster.finder().byId(id);
 
         if (cluster == null) {
             return notFound();
@@ -63,41 +71,22 @@ public class ClusterController extends Controller {
             JsonNode json = request().body().asJson();
             body = (ObjectNode) json;
         } catch (ClassCastException e) {
+            e.printStackTrace();
             return badRequest("Cannot cast request body to ObjectNode: " + e.getMessage());
         }
-
-        Iterator<String> fields = clusterJson.fieldNames();
-        while (fields.hasNext()) {
-            String field = fields.next();
-
-            if (field.equals("id")) {
-                continue;
-            }
-
-            if (body.has(field)) {
-                clusterJson.replace(field, body.findPath(field));
-            }
-        }
-
-        try {
-            cluster = Json.fromJson(clusterJson, Cluster.class);
-
-            cluster.update();
-
-            return noContent();
-        } catch (RuntimeException e) {
-            return badRequest("Unable to update cluster: " + e.getMessage());
-        }
+        Cluster.resourceFormat().reads(play.api.libs.json.Json.parse(body.toString())).get().update(cluster);
+        cluster.save();
+        return noContent();
     }
 
     public Result deleteCluster(long id) {
-        Cluster cluster = Cluster.find.byId(id);
+        Cluster cluster = Cluster.finder().byId(id);
 
         if (cluster == null) {
             return notFound();
         }
-
+        String deletedCluster = Cluster.format().writes(cluster).toString();
         cluster.delete();
-        return ok(jsonContext.toJson(cluster));
+        return ok(deletedCluster);
     }
 }

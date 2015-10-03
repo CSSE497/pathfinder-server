@@ -2,25 +2,23 @@ package io.pathfinder.controllers
 
 import play.api.mvc.{Controller,Action}
 import play.api.libs.json.{Json,Reads,Writes}
-import io.pathfinder.data.{CrudDao,Update}
+import io.pathfinder.data.{CrudDao,Resource}
 
 /**
  * A controller that implements CRUD methods to any controller that extends it
  */
 abstract class CrudController[K,V](dao: CrudDao[K,V])
-        (implicit val reads: Reads[V], implicit val writes: Writes[V], implicit val updates: Reads[_ <: Update[V]]) extends Controller {
+        (implicit val reads: Reads[V], implicit val writes: Writes[V], implicit val resources: Reads[_ <: Resource[V]]) extends Controller {
 
     /**
      * returns all of this controller's models
      */
     def getAll = Action(Ok(Json.toJson(dao.readAll)))
 
-    def get(id: K) = Action{
-        dao.read(id).map{
+    def get(id: K) = Action {
+        dao.read(id).map {
             model => Ok(Json.toJson(model))
-        } getOrElse (
-            NotFound
-        )
+        } getOrElse NotFound
     }
 
     /**
@@ -29,16 +27,12 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
      * with a 201 code.
      */
     def post = Action(parse.json){ request =>
-        updates.reads(request.body).map {
-            update =>
-                dao.create(update).map {
+        resources.reads(request.body).map {
+            create =>
+                dao.create(create).map {
                     model => Created(Json.toJson(model))
-                } getOrElse(
-                    BadRequest // received incomplete model
-                )
-        } getOrElse (
-            BadRequest
-        )
+                } getOrElse BadRequest
+        } getOrElse BadRequest
     }
 
     /**
@@ -47,13 +41,13 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
      * if successful.
      */
     def put(id: K) = Action(parse.json){ request =>
-        updates.reads(request.body).map {
+        resources.reads(request.body).map {
             update =>
                 dao.update(id,update).map{
                     model =>
                         Ok(Json.toJson(model))
-                } getOrElse(NotFound)
-        } getOrElse (BadRequest)
+                } getOrElse NotFound
+        } getOrElse BadRequest
     }
 
     /**
@@ -63,6 +57,6 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
         dao.delete(id).map{
             model =>
                 Ok(Json.toJson(model))
-        } getOrElse (NotFound)
+        } getOrElse NotFound
     }
 }
