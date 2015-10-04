@@ -60,7 +60,7 @@ object Commodity {
 }
 
 @Entity
-class Commodity() extends Model {
+class Commodity() extends Model with HasParent {
     @Id
     @Column(name="id", nullable=false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,5 +1,7 @@
 package io.pathfinder.models
 
+import javax.persistence.Column
+
 import com.avaje.ebean.Model
 import javax.persistence._
 import play.api.libs.json.{Format,Json}
@@ -51,7 +53,7 @@ object Vehicle {
 }
 
 @Entity
-class Vehicle() extends Model {
+class Vehicle() extends Model with HasParent {
 
     @Id
     @Column(nullable = false)
