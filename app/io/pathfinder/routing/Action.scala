@@ -37,7 +37,7 @@ object Action {
 
     implicit val format: Format[Action] = Format(
         for {
-            name <- (JsPath \ "name").read[String]
+            name <- (JsPath \ "action").read[String]
             lat <- (JsPath \ "latitude").read[Double]
             lng <- (JsPath \ "longitude").read[Double]
             com <- (JsPath \ "commodity").read[Long]
@@ -48,7 +48,7 @@ object Action {
             }
         }, Writes[Action](
             a => Json.obj(
-                "name" -> a.name,
+                "action" -> a.name,
                 "latitude" -> a.latitude,
                 "longitude" -> a.longitude,
                 "commodity" -> a.commodity
