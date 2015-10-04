@@ -5,7 +5,6 @@
 
 create table cluster (
   id                        bigint auto_increment not null,
-  parent_id                 bigint,
   constraint pk_cluster primary key (id))
 ;
 
@@ -15,7 +14,6 @@ create table commodity (
   startLongitude            double not null,
   endLatitude               double not null,
   endLongitude              double not null,
-  parent_id                 bigint,
   param                     integer,
   constraint pk_commodity primary key (id))
 ;
@@ -25,13 +23,12 @@ create table vehicle (
   latitude                  double not null,
   longitude                 double not null,
   capacity                  integer not null,
+  parent_id                 bigint,
   constraint pk_vehicle primary key (id))
 ;
 
-alter table cluster add constraint fk_cluster_parent_1 foreign key (parent_id) references cluster (id) on delete restrict on update restrict;
-create index ix_cluster_parent_1 on cluster (parent_id);
-alter table commodity add constraint fk_commodity_parent_2 foreign key (parent_id) references cluster (id) on delete restrict on update restrict;
-create index ix_commodity_parent_2 on commodity (parent_id);
+alter table vehicle add constraint fk_vehicle_parent_1 foreign key (parent_id) references cluster (id) on delete restrict on update restrict;
+create index ix_vehicle_parent_1 on vehicle (parent_id);
 
 
 
