@@ -93,6 +93,7 @@ object WebSocketMessage {
     id: Long,
     value:   JsValue
   ) extends ControllerMessage
+  implicit val routedFormat = Json.format[Routed]
 
   /**
    * Sent by the client that wants to read a model from the database
@@ -201,6 +202,7 @@ object WebSocketMessage {
       case s: Subscribed   => (JsPath \ "subscribed").write(subscribedFormat).writes(s)
       case u: UnSubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
       case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
+      case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
       case e: Error        => errorFormat.writes(e)
       case u: UnknownMessage => unknownMessageFormat.writes(u)
     }

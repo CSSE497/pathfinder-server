@@ -11,8 +11,8 @@ import io.pathfinder.websockets.WebSocketMessage.{Route => RouteMsg, Routed}
  */
 object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTypes.Vehicle,Vehicle.Dao) {
 
-    override def receive(webSocketMessage: WebSocketMessage) = {
-        case RouteMsg(_,id) => Vehicle.Dao.read(id).map{
+    override def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage] = webSocketMessage match {
+        case RouteMsg(t,id) => Vehicle.Dao.read(id).map{
             v =>
                 val actions = v.parent.commodities.foldLeft(Seq.newBuilder[Action]){
                     (builder, com) =>
@@ -21,8 +21,8 @@ object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTyp
                 }.result()
                 val route = Route(id,actions)
                 Routed(ModelTypes.Vehicle,id,Route.format.writes(route))
-        } getOrElse WebSocketMessage.Error("No Vehicle with id: "+id)
-        case x => super.receive(x)
+            }.orElse(Some(WebSocketMessage.Error("No Vehicle with id: "+id)))
+        case x: WebSocketMessage => super.receive(x)
     }
 }
 

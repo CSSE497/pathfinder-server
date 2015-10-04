@@ -10,7 +10,7 @@ object ModelTypes extends Enumeration {
     val Vehicle, Commodity, Cluster = Value
 
     implicit val format: Format[Value] = Format(
-      Json.reads[String].map(ModelTypes.withName),
-      { case v: Value => Json.writes[String].writes(v.toString) }
+      Reads.JsStringReads.map(json => ModelTypes.withName(json.value)),
+      Writes(v => JsString(v.toString))
     )
 }
