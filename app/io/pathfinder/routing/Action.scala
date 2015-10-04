@@ -1,7 +1,7 @@
 package io.pathfinder.routing
 
 import io.pathfinder.models.Commodity
-import play.api.libs.json.{Json,Format}
+import play.api.libs.json.{Writes, Json, JsPath, Format}
 
 sealed abstract class Action(val name: String) {
     def latitude: Double
@@ -35,18 +35,24 @@ object Action {
         )
     }
 
-    implicit val format = Format(
-        Json.reads[(String,Double,Double,Long)].map{
-            case ("pickup",latitude,longitude,commodity)  => PickUp(latitude,longitude,commodity)
-            case ("dropoff",latitude,longitude,commodity) => DropOff(latitude,longitude,commodity)
-        },
-        {
-            case a: Action => Json.writes[(String,Double,Double,Long)].writes(
-                a.name,
-                a.latitude,
-                a.longitude,
-                a.commodity
+    implicit val format: Format[Action] = Format(
+        for {
+            name <- (JsPath \ "name").read[String]
+            lat <- (JsPath \ "latitude").read[Double]
+            lng <- (JsPath \ "longitude").read[Double]
+            com <- (JsPath \ "commodity").read[Long]
+        } yield {
+            name match {
+                case "pickup" => PickUp(lat, lng, com)
+                case "dropoff" => DropOff(lat, lng, com)
+            }
+        }, Writes[Action](
+            a => Json.obj(
+                "name" -> a.name,
+                "latitude" -> a.latitude,
+                "longitude" -> a.longitude,
+                "commodity" -> a.commodity
             )
-        }
+        )
     )
 }
