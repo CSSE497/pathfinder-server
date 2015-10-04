@@ -28,3 +28,10 @@ resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 // Play provides two styles of routers, one expects its actions to be injected, the
 // other, legacy style, accesses its actions statically.
 routesGenerator := InjectedRoutesGenerator
+
+// Docker configuration
+packageName in Docker := "pathfinder-server"
+version in Docker := "0.1"
+maintainer in Docker := "Pathfinder Team"
+dockerRepository := Some("gcr.io/phonic-aquifer-105721")
+dockerExposedPorts := Seq(9000, 9443)
