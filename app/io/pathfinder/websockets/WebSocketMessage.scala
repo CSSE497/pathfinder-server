@@ -81,17 +81,22 @@ object WebSocketMessage {
   ) extends ControllerMessage
   implicit val deleteFormat = Json.format[Delete]
 
-
+  /**
+   * Request for when the client wants a route for a vehicle or commodity
+   */
   case class Route(
     model: ModelType,
     id:    Long
   ) extends ControllerMessage
   implicit val routeFormat = Json.format[Route]
 
+  /**
+   * Response for a route request
+   */
   case class Routed(
-    model:   ModelType,
-    id: Long,
-    value:   JsValue
+    model: ModelType,
+    id:    Long,
+    value: JsValue
   ) extends ControllerMessage
   implicit val routedFormat = Json.format[Routed]
 
