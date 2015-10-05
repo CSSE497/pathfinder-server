@@ -14,7 +14,7 @@ object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTyp
     override def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage] = webSocketMessage match {
         case RouteMsg(t,id) => Vehicle.Dao.read(id).map{
             v =>
-                val coms = if(v.parent == null) asScalaBuffer(Commodity.finder.all()) else v.parent.commodities
+                val coms = asScalaBuffer(Commodity.finder.all())
                 val actions = coms.foldLeft(Seq.newBuilder[Action] += new Start(v)){
                     (builder, com) =>
                         builder += new PickUp(com) += new DropOff(com)
