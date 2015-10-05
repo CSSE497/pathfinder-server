@@ -5,11 +5,12 @@ import javax.persistence.{Column, Entity, GeneratedValue, GenerationType, Id, Ma
 import com.avaje.ebean.Model
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.pathfinder.data.{Resource, EbeanCrudDao}
+import io.pathfinder.websockets.WebSocketDao
 import play.api.libs.json.{Json, Format}
 
 object Commodity {
     val finder: Model.Find[Long,Commodity] = new Model.Finder[Long,Commodity](classOf[Commodity])
-    object Dao extends EbeanCrudDao[Long,Commodity](finder)
+    object Dao extends WebSocketDao[Commodity](finder)
 
     implicit val format: Format[Commodity] = Json.format[Commodity]
     implicit val resourceFormat: Format[CommodityResource] = Json.format[CommodityResource]
@@ -80,4 +81,7 @@ class Commodity() extends Model with HasParent {
 
     @Column(name = "param")
     var param: Int = 0
+
+    @ManyToOne
+    var parent: Cluster = null
 }
