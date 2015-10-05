@@ -1,0 +1,8 @@
+engines:
+  fixme:
+    enabled: true
+  scalastyle:
+    enabled: true
+ratings:
+  paths:
+  - app/**
