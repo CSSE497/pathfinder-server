@@ -1,75 +1,27 @@
 package io.pathfinder.websockets
 
-import javax.management.NotificationBroadcaster
-
-import akka.actor.ActorRef
 import com.avaje.ebean.Model.Find
 import io.pathfinder.data.{EbeanCrudDao, ObserverDao, CrudDao}
-import io.pathfinder.models.HasParent
-import io.pathfinder.websockets.ModelTypes.ModelType
-import play.api.libs.iteratee.Concurrent.Channel
-import play.api.libs.iteratee.{Input, Iteratee, Enumerator, Concurrent}
-import play.api.libs.json.Writes
-import scala.collection.concurrent
-import scala.volatile
-
-abstract class Pusher[V] {
-}
-
-class Subscription[V](ch: Channel[V]) extends Channel[V]{
-
-    @volatile
-    private var done: Boolean = false
-
-    def isDone = done
-
-    override def end(): Unit = done = true
-
-    override def push(chunk: Input[V]): Unit = ch.push(chunk)
-
-    override def end(e: Throwable): Unit = done = true
-}
+import io.pathfinder.models.{Cluster, HasParent}
+import play.api.libs.iteratee.{Iteratee, Enumerator, Concurrent}
 
 /**
  * this class listens for changed to models so that it can push the changes to registered websocket clients
  */
-class WebSocketDao[V <: HasParent](modelType: ModelType, dao: CrudDao[Long,V])(implicit writes: Writes[V]) extends ObserverDao(dao) {
 
-    def this(modelType: ModelType, find: Find[Long,V]) = this(modelType, new EbeanCrudDao[Long,V](find))
+class WebSocketDao[V <: HasParent](dao: CrudDao[Long,V]) extends ObserverDao(dao) {
 
-    import WebSocketMessage.{Created => CreatedMsg, Deleted => DeletedMsg, Updated => UpdatedMsg}
-    val x =
-    val (createdEnumerator, createdChannel) = Concurrent.broadcast[V] // sends Created messages to registered clients
-    val (deletedEnumerator, deletedChannel) = Concurrent.broadcast[V] // sends Deleted messages to registered clients
-    val (updatedEnumerator, updatedChannel) = Concurrent.broadcast[V] // sends Updated messages to registered clients
-    val (changedEnumerator, changedChannel) = Concurrent.broadcast[V]
+    def this(find: Find[Long,V]) = this(new EbeanCrudDao[Long,V](find))
 
-    createdEnumerator(Iteratee.foreach{
-        model =>
-            lazy val msg = CreatedMsg(modelType, writes.writes(model))
-            clusterSubs.get((model.parent.id,Events.Created)).foreach(_.push(msg))
-            modelSubs.get((model.id, Events.Created)).foreach(_.push(msg))
-    })
-    deletedEnumerator(Iteratee.foreach{
-        model =>
-            lazy val msg = DeletedMsg(modelType, writes.writes(model))
-            clusterSubs.get((model.parent.id,Events.Deleted)).foreach(_.push(msg))
-            modelSubs.get((model.id, Events.Deleted)).foreach(_.push(msg))
-    })
-    updatedEnumerator(Iteratee.foreach{
-        model =>
-            lazy val msg = UpdatedMsg(modelType, writes.writes(model))
-            clusterSubs.get((model.parent.id,Events.Updated)).foreach(_.push(msg))
-            modelSubs.get((model.id, Events.Updated)).foreach(_.push(msg))
-    })
-
-    /*
-     * Cluster -> ModelType -> Event -> Model
-     */
-    private val clusterChannels: concurrent.Map[(Long,Events.Value),Channel[WebSocketMessage]] = concurrent.TrieMap.empty
-    private val modelChannels: concurrent.Map[(Long,Events.Value),Channel[WebSocketMessage]] = concurrent.TrieMap.empty
-    private val clusterEnumorators: concurrent.Map[(Long,Events.Value),Channel[WebSocketMessage]] = concurrent.TrieMap.empty
-    private val modelEnumerators: concurrent.Map[(Long,Events.Value),Channel[WebSocketMessage]] = concurrent.TrieMap.empty
+    val (createdEnumerator, createdChannel) = Concurrent.broadcast[V]
+    val (deletedEnumerator, deletedChannel) = Concurrent.broadcast[V]
+    val (updatedEnumerator, updatedChannel) = Concurrent.broadcast[V]
+    val changedEnumerator = Concurrent.unicast[(Events.Value,V)]{
+        channel =>
+            createdEnumerator(Iteratee.foreach(m => channel.push(Events.Created->m)))
+            deletedEnumerator(Iteratee.foreach(m => channel.push(Events.Deleted->m)))
+            updatedEnumerator(Iteratee.foreach(m => channel.push(Events.Updated->m)))
+    }
 
     protected def onCreated(model: V): Unit = {
         createdChannel.push(model)
@@ -83,12 +35,23 @@ class WebSocketDao[V <: HasParent](modelType: ModelType, dao: CrudDao[Long,V])(i
         updatedChannel.push(model)
     }
 
-    final def clusterSubscribe(client: Channel[WebSocketMessage], cluster: Long, eventOpt: Option[Events.Value]): Subscription[WebSocketMessage] =
-        val sub = new Subscription[WebSocketMessage](client)
-        eventOpt.getOrElse(Events.Changed) match {
-            case Events.Created =>
-            case Events.Deleted => new WebSocketSubscription(client,deletedEnumerator)
-            case Events.Updated => new WebSocketSubscription(client,updatedEnumerator)
-            case Events.Changed => new WebSocketSubscription(client,changedEnumerator)
+    final def clusterSubscribe(cluster: Cluster) = clusterSubscribe(cluster.id)
+
+    final def clusterSubscribe(cluster: Long): Enumerator[(Events.Value,V)] =
+        Concurrent.unicast{
+            channel => changedEnumerator(Iteratee.foreach{ // do something about null parents
+                case (evt,mod) => if(mod.parent == null || mod.parent.id == cluster) channel.push(evt, mod)
+            })
+        }
+
+    final def clusterSubscribe(cluster: Cluster, event: Events.Value) = clusterSubscribe(cluster.id, event)
+
+    final def clusterSubscribe(cluster: Long, event: Events.Value): Enumerator[V] =
+        Concurrent.unicast {
+            channel => (event match {
+                case Events.Created => createdEnumerator
+                case Events.Deleted => deletedEnumerator
+                case Events.Updated => updatedEnumerator
+            }).apply(Iteratee.foreach(channel.push))
         }
 }

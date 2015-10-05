@@ -7,7 +7,7 @@ import play.api.libs.json._
  */
 object Events extends Enumeration {
   type Event = Value
-  val Created, Updated, Deleted, Changed = Value
+  val Created, Updated, Deleted = Value
 
   val reads: Reads[Value] = Reads.JsStringReads.map{str => Events.withName(str.value)}
 

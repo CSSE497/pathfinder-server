@@ -4,6 +4,7 @@ import javax.persistence.Column
 
 import com.avaje.ebean.Model
 import javax.persistence._
+import io.pathfinder.websockets.WebSocketDao
 import play.api.libs.json.{Format,Json}
 import io.pathfinder.data.{Resource,EbeanCrudDao}
 
@@ -11,7 +12,7 @@ object Vehicle {
 
     val finder: Model.Find[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
 
-    object Dao extends EbeanCrudDao[Long,Vehicle](finder)
+    object Dao extends WebSocketDao[Vehicle](finder)
 
     implicit val format: Format[Vehicle] = Json.format[Vehicle]
 
