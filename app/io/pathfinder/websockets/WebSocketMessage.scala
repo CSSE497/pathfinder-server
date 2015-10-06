@@ -16,14 +16,14 @@ object WebSocketMessage {
    * These messages are routed to controllers based on the model they contain
    */
   sealed abstract class ControllerMessage extends WebSocketMessage {
-    val model: ModelType
+    def model: ModelType
   }
 
   /**
    * Standard error messages sent to client that make poor request
    */
-  case class ErrorMessage(error: String) extends WebSocketMessage
-  implicit val errorMessageFormat = Json.format[ErrorMessage]
+  case class Error(error: String) extends WebSocketMessage
+  implicit val errorFormat = Json.format[Error]
 
   case class UnknownMessage(value: JsValue) extends WebSocketMessage
   implicit object unknownMessageFormat extends Format[UnknownMessage]{
@@ -66,8 +66,8 @@ object WebSocketMessage {
    * Sent by the client to update a model with the specified id
    */
   case class Update(
-    model: ModelType,
-    id:    Long,
+    model:  ModelType,
+    id:     Long,
     value: JsValue
   ) extends ControllerMessage
   implicit val updateFormat = Json.format[Update]
@@ -77,16 +77,35 @@ object WebSocketMessage {
    */
   case class Delete(
     model: ModelType,
-    id:     Long
+    id:    Long
   ) extends ControllerMessage
   implicit val deleteFormat = Json.format[Delete]
+
+  /**
+   * Request for when the client wants a route for a vehicle or commodity
+   */
+  case class Route(
+    model: ModelType,
+    id:    Long
+  ) extends ControllerMessage
+  implicit val routeFormat = Json.format[Route]
+
+  /**
+   * Response for a route request
+   */
+  case class Routed(
+    model: ModelType,
+    id:    Long,
+    value: JsValue
+  ) extends ControllerMessage
+  implicit val routedFormat = Json.format[Routed]
 
   /**
    * Sent by the client that wants to read a model from the database
    */
   case class Read(
     model: ModelType,
-    id:   Long
+    id:    Long
   ) extends ControllerMessage
   implicit val readFormat = Json.format[Read]
 
@@ -94,8 +113,8 @@ object WebSocketMessage {
    * Message sent to the client that requested a read
    */
   case class Created(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val createdFormat = Json.format[Created]
 
@@ -104,8 +123,8 @@ object WebSocketMessage {
    * or any clients that have subscribed to updates
    */
   case class Updated(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val updatedFormat = Json.format[Updated]
 
@@ -113,8 +132,8 @@ object WebSocketMessage {
    * Message sent to a client that requested a read
    */
   case class Model(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val modelFormat = Json.format[Model]
 
@@ -122,8 +141,8 @@ object WebSocketMessage {
    * Message sent to a client that requested a delete
    */
   case class Deleted(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val deletedFormat = Json.format[Deleted]
 
@@ -165,7 +184,9 @@ object WebSocketMessage {
     (JsPath \ "deleted").read[Deleted].map(identity[WebSocketMessage]) orElse
     (JsPath \ "subscribed").read[Subscribed].map(identity[WebSocketMessage]) orElse
     (JsPath \ "unsubscribed").read[UnSubscribed].map(identity[WebSocketMessage]) orElse
-    errorMessageFormat.map(identity[WebSocketMessage]) orElse unknownMessageFormat.map(identity[WebSocketMessage])
+    (JsPath \ "route").read[Route].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routed").read[Routed].map(identity[WebSocketMessage]) orElse
+    errorFormat.map(identity[WebSocketMessage]) orElse unknownMessageFormat.map(identity[WebSocketMessage])
 
   /**
    * Converts WebSocketMessages into Json
@@ -185,7 +206,9 @@ object WebSocketMessage {
       case d: Deleted      => (JsPath \ "deleted").write(deletedFormat).writes(d)
       case s: Subscribed   => (JsPath \ "subscribed").write(subscribedFormat).writes(s)
       case u: UnSubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
-      case e: ErrorMessage => errorMessageFormat.writes(e)
+      case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
+      case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
+      case e: Error        => errorFormat.writes(e)
       case u: UnknownMessage => unknownMessageFormat.writes(u)
     }
   }
