@@ -26,13 +26,16 @@ class WebSocketActor (
     import WebSocketMessage._
 
     override def receive = {
-        case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
-        case Subscribe(cluster, model, event, id) => {
-            client ! ErrorMessage("Not Implemented")
-        }
-        case UnSubscribe(cluster, model, event, id) => {
-            client ! ErrorMessage("Not Implemented")
-        }
-        case UnknownMessage(value) => client ! ErrorMessage("Received unknown message: "+value.toString)
+        case c: ControllerMessage => controllers.get(c.model).map(
+            _.receive(c)
+        ).getOrElse(
+            Some(Error("No Controller for model: "+c.model))
+        ).foreach(client ! _)
+
+        case Subscribe(cluster, model, event, id) => client ! Error("Not Implemented")
+
+        case UnSubscribe(cluster, model, event, id) => client ! Error("Not Implemented")
+
+        case UnknownMessage(value) => client ! Error("Received unknown message: "+value.toString)
     }
 }
