@@ -2,9 +2,11 @@ package io.pathfinder.websockets.controllers
 
 import io.pathfinder.models.{Commodity, Cluster, Vehicle}
 import io.pathfinder.routing.Action.{Start, DropOff, PickUp}
-import io.pathfinder.routing.{Action, Route}
+import io.pathfinder.routing.{Router, Action, Route}
 import io.pathfinder.websockets.{WebSocketMessage, ModelTypes}
-import io.pathfinder.websockets.WebSocketMessage.{Route => RouteMsg, Routed}
+import io.pathfinder.websockets.WebSocketMessage.{Route => RouteMsg, Error, Created, Create, Routed}
+import play.Logger
+import scala.Error
 import scala.collection.JavaConversions.asScalaBuffer
 /**
  * manages vehicle API calls
@@ -14,6 +16,7 @@ object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTyp
     override def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage] = webSocketMessage match {
         case RouteMsg(t,id) => Vehicle.Dao.read(id).map{
             v =>
+                Logger.info("VehicleSocketController received RouteMsg: " + v)
                 val coms = if(v.parent == null) asScalaBuffer(Commodity.finder.all()) else v.parent.commodities
                 val actions = coms.foldLeft(Seq.newBuilder[Action] += new Start(v)){
                     (builder, com) =>
@@ -26,4 +29,3 @@ object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTyp
         case x: WebSocketMessage => super.receive(x)
     }
 }
-

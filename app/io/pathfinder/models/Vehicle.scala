@@ -54,7 +54,7 @@ object Vehicle {
 }
 
 @Entity
-class Vehicle() extends Model with HasParent {
+class Vehicle() extends Model {
 
     @Id
     @Column(nullable = false)
