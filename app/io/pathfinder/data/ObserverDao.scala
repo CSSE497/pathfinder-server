@@ -1,5 +1,6 @@
 package io.pathfinder.data
 
+import com.avaje.ebean.Model
 import com.avaje.ebean.Model.Find
 
 /**
@@ -8,7 +9,7 @@ import com.avaje.ebean.Model.Find
  * @tparam Long
  * @tparam V
  */
-abstract class ObserverDao[Long,V](dao: CrudDao[Long,V]) extends CrudDao[Long,V] {
+abstract class ObserverDao[Long,V <: Model](dao: CrudDao[Long,V]) extends CrudDao[Long,V] {
 
   def this(find: Find[Long,V]) = this(new EbeanCrudDao[Long,V](find))
 
@@ -36,7 +37,7 @@ abstract class ObserverDao[Long,V](dao: CrudDao[Long,V]) extends CrudDao[Long,V]
   final override def read(id: Long): Option[V] = dao.read(id)
 
   final override def create(model: V): V = {
-    val mod = dao.create(model)
+    val mod: V = dao.create(model)
     onCreated(mod)
     mod
   }

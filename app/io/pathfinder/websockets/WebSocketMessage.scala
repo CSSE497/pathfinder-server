@@ -58,7 +58,6 @@ object WebSocketMessage {
    */
   case class Create(
     model: ModelType,
-    parent: Long,
     value: JsValue
   ) extends ControllerMessage
   implicit val createFormat = Json.format[Create]

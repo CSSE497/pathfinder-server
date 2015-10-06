@@ -61,7 +61,7 @@ object Commodity {
 }
 
 @Entity
-class Commodity() extends Model with HasParent {
+class Commodity() extends Model {
     @Id
     @Column(name="id", nullable=false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -81,7 +81,4 @@ class Commodity() extends Model with HasParent {
 
     @Column(name = "param")
     var param: Int = 0
-
-    @ManyToOne
-    var parent: Cluster = null
 }
