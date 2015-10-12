@@ -1,11 +1,12 @@
 package io.pathfinder.models
 
-import javax.persistence.{Column, Entity, GeneratedValue, GenerationType, Id, ManyToOne}
+import javax.persistence._
 
 import com.avaje.ebean.Model
 
 import io.pathfinder.websockets.WebSocketDao
 import io.pathfinder.data.{ClusterQueries, Resource}
+
 import play.api.libs.json.{Json, Format}
 
 object Commodity {
@@ -76,6 +77,7 @@ object Commodity {
 
 @Entity
 class Commodity() extends Model {
+
     @Id
     @Column(name="id", nullable=false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -96,7 +98,7 @@ class Commodity() extends Model {
     @Column(name = "param")
     var param: Int = 0
 
-    @Column(nullable=false)
-    @ManyToOne
+    @JoinColumn(name="cluster", nullable=false)
+    @ManyToOne(optional=false)
     var cluster: Cluster = null
 }

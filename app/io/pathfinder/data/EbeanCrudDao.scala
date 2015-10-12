@@ -24,7 +24,7 @@ class EbeanCrudDao[K,M <: Model](protected val finder: Model.Find[K,M]) extends 
         model   <- Option(finder.byId(id))
         updated <- update.update(model)
     } yield {
-        updated.save()
+        updated.update()
         updated
     }
 

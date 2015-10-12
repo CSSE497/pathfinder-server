@@ -1,10 +1,9 @@
 package io.pathfinder.models
 
-import javax.persistence.Column
 
 import com.avaje.ebean.Model
-import javax.persistence._
 import io.pathfinder.websockets.WebSocketDao
+import javax.persistence.{ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
 import play.api.libs.json.{Format,Json}
 import io.pathfinder.data.{ClusterQueries, Resource}
 
@@ -31,9 +30,9 @@ object Vehicle {
         capacity:  Option[Int]
     ) extends Resource[Vehicle] {
         override def update(v: Vehicle): Option[Vehicle] = {
-            latitude.foreach(v.latitude  = _)
+            latitude.foreach(v.latitude = _)
             longitude.foreach(v.longitude = _)
-            capacity.foreach(v.capacity  = _)
+            capacity.foreach(v.capacity = _)
             clusterId.foreach {
                 Cluster.Dao.read(_).foreach(v.cluster = _)
             }
