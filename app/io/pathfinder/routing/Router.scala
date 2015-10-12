@@ -63,7 +63,7 @@ object Router {
         routes.foreach {
             case (v,route) => {
                 Logger.info(String.format("Notififying observers of new route for %s", v))
-                vehicles.get(v).get.foreach{actor => actor ! Routed(ModelTypes.Vehicle, v.id, Route.format.writes(route))}
+                vehicles.get(v).get.foreach{actor => actor ! Routed(ModelTypes.Vehicle, v.id, Route.writes.writes(route))}
             }
         }
         Logger.info("Finished recalculating routes")
