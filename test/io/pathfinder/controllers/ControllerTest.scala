@@ -1,7 +1,7 @@
-package io.pathfinder.test
+package io.pathfinder.controllers
 
-import org.scalatestplus.play.PlaySpec
 import org.scalatest.MustMatchers
-import play.api.test.{FutureAwaits,DefaultAwaitTimeout}
+import org.scalatestplus.play.PlaySpec
+import play.api.test.{DefaultAwaitTimeout, FutureAwaits}
 
 abstract class ControllerTest extends PlaySpec with MustMatchers with FutureAwaits with DefaultAwaitTimeout

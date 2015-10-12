@@ -1,10 +1,9 @@
-package io.pathfinder.test
+package io.pathfinder.controllers
 
 import org.scalatest.mock.MockitoSugar
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
-import io.pathfinder.controllers.CrudController
 import io.pathfinder.data.{Resource, CrudDao}
 import org.mockito.Mockito.when
 import org.mockito.Matchers.{anyLong,isA}

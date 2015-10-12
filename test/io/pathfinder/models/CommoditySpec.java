@@ -1,3 +1,5 @@
+package io.pathfinder.models;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -17,8 +19,6 @@ import static org.junit.Assert.fail;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import io.pathfinder.models.Commodity;
 
 import java.util.LinkedList;
 import java.util.List;
