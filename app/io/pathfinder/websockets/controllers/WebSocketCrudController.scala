@@ -17,7 +17,7 @@ abstract class WebSocketCrudController[V <: ebean.Model](
 )(implicit
     val reads: Reads[V],
     val writes: Writes[V],
-    val resources: Reads[_ <: Resource[V]]
+    val resources: Reads[_ <: Resource[Long,V]]
 ) extends WebSocketController {
 
     override def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage] = {
