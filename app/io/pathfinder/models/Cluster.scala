@@ -22,7 +22,7 @@ object Cluster {
         id: Option[Long],
         vehicles: Option[Seq[Vehicle.VehicleResource]],
         commodities: Option[Seq[Commodity.CommodityResource]]
-    ) extends Resource[Long, Cluster] {
+    ) extends Resource[Cluster] {
         /** Updates the specified model with the resource's fields. */
         override def update(model: Cluster): Option[Cluster] = {
             vehicles.foreach(
