@@ -3,6 +3,10 @@ package io.pathfinder.models;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import play.api.libs.json.JsResult;
+import play.api.libs.json.Json;
 import play.mvc.Result;
 import play.test.Helpers;
 import play.mvc.Http.RequestBuilder;
@@ -19,13 +23,29 @@ import static org.junit.Assert.fail;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import scala.Option;
 
 import java.util.LinkedList;
 import java.util.List;
 
+@RunWith(JUnit4.class)
 public class CommodityTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
     private FakeApplication fakeApp;
+
+    private static final double TOLERANCE = 0.00001;
+    private static final int ID = 13;
+    private static final double START_LATITUDE = 0.123;
+    private static final double START_LONGITUDE = 3.89;
+    private static final double END_LATITUDE = -12.3;
+    private static final double END_LONGITUDE = 100.9;
+    private static final int PARAM = 5;
+    private static final String JSON_COMMODITY = String.format(
+        "{\"id\":%d,\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"param\":%d}",
+        ID, START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, PARAM);
+    private static final String JSON_PARTIAL_COMMODITY = String.format(
+        "{\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"param\":%d}",
+        START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, PARAM);
 
     private JsonNode bodyForResult(Result r) {
         String resultBody;
@@ -275,4 +295,39 @@ public class CommodityTest {
         });
     }
 
+    @Test
+    public void testCommodityDeserializesWithoutErrors() {
+        JsResult result = Commodity.format().reads(Json.parse(JSON_COMMODITY));
+        assertTrue(result.isSuccess());
+    }
+
+    @Test
+    public void testCommodityDeserializesCorrectly() {
+        Commodity actual = Commodity.format().reads(Json.parse(JSON_COMMODITY)).get();
+        assertEquals(ID, actual.id());
+        assertEquals(START_LATITUDE, actual.startLatitude(), TOLERANCE);
+        assertEquals(START_LONGITUDE, actual.startLongitude(), TOLERANCE);
+        assertEquals(END_LATITUDE, actual.endLatitude(), TOLERANCE);
+        assertEquals(END_LONGITUDE, actual.endLongitude(), TOLERANCE);
+        assertEquals(PARAM, actual.param());
+    }
+
+    @Test
+    public void tesCommodityResourceDeserializesWithoutErrors() {
+        JsResult result = Commodity.resourceFormat().reads(Json.parse(JSON_PARTIAL_COMMODITY));
+        assertTrue(result.isSuccess());
+    }
+
+    @Test
+    public void testCommodityResourceDeserializesCorrectly() {
+        Option<Commodity> result =
+            Commodity.resourceFormat().reads(Json.parse(JSON_PARTIAL_COMMODITY)).get().create();
+        assertTrue(result.nonEmpty());
+        Commodity actual = result.get();
+        assertEquals(START_LATITUDE, actual.startLatitude(), TOLERANCE);
+        assertEquals(START_LONGITUDE, actual.startLongitude(), TOLERANCE);
+        assertEquals(END_LATITUDE, actual.endLatitude(), TOLERANCE);
+        assertEquals(END_LONGITUDE, actual.endLongitude(), TOLERANCE);
+        assertEquals(PARAM, actual.param());
+    }
 }
