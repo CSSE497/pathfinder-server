@@ -8,7 +8,7 @@ import io.pathfinder.data.{CrudDao,Resource}
  * A controller that implements CRUD methods to any controller that extends it
  */
 abstract class CrudController[K,V](dao: CrudDao[K,V])
-        (implicit val reads: Reads[V], implicit val writes: Writes[V], implicit val resources: Reads[_ <: Resource[V]]) extends Controller {
+        (implicit val reads: Reads[V], implicit val writes: Writes[V], implicit val resources: Reads[_ <: Resource[K,V]]) extends Controller {
 
     /**
      * returns all of this controller's models

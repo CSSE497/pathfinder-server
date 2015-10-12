@@ -48,11 +48,11 @@ public class ClusterController extends Controller {
             return created(Cluster.format().writes(cluster).toString());
         } catch (PersistenceException e) {
             e.printStackTrace();
-            Logger.error(String.format("Error saving cluster to the database: %s", e.getMessage()));
+            Logger.error(String.format("Error saving cluster to the database: %s", e));
             return internalServerError("Error saving cluster to the database: " + e.getMessage());
         } catch (RuntimeException e) {
             e.printStackTrace();
-            Logger.error("Unable to map json to cluster object: " + jsVal.toString());
+            Logger.error("Unable to map json to cluster object: " + jsVal.toString(), e);
             return badRequest("Unable to map json to cluster object: " + jsVal.toString());
         }
     }
