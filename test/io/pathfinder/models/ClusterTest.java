@@ -29,7 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
-public class ClusterSpec {
+public class ClusterTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
     private FakeApplication fakeApp;
 

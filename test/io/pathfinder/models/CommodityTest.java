@@ -23,7 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.LinkedList;
 import java.util.List;
 
-public class CommoditySpec {
+public class CommodityTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
     private FakeApplication fakeApp;
 
