@@ -1,12 +1,8 @@
-package io.pathfinder.test;
+package io.pathfinder.models;
 
-import akka.util.Timeout;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import io.pathfinder.models.Cluster;
-import io.pathfinder.models.Commodity;
-import io.pathfinder.models.Vehicle;
 import play.libs.Json;
 import play.mvc.Result;
 import play.test.Helpers;
@@ -26,7 +22,6 @@ import scala.collection.JavaConversions;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import scalaz.concurrent.Future;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -34,7 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
-public class ClusterSpec {
+public class ClusterTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
     private FakeApplication fakeApp;
 

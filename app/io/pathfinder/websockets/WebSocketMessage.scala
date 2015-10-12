@@ -66,8 +66,8 @@ object WebSocketMessage {
    * Sent by the client to update a model with the specified id
    */
   case class Update(
-    model: ModelType,
-    id:    Long,
+    model:  ModelType,
+    id:     Long,
     value: JsValue
   ) extends ControllerMessage
   implicit val updateFormat = Json.format[Update]
@@ -113,8 +113,8 @@ object WebSocketMessage {
    * Message sent to the client that requested a read
    */
   case class Created(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val createdFormat = Json.format[Created]
 
@@ -123,8 +123,8 @@ object WebSocketMessage {
    * or any clients that have subscribed to updates
    */
   case class Updated(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val updatedFormat = Json.format[Updated]
 
@@ -132,8 +132,8 @@ object WebSocketMessage {
    * Message sent to a client that requested a read
    */
   case class Model(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val modelFormat = Json.format[Model]
 
@@ -141,8 +141,8 @@ object WebSocketMessage {
    * Message sent to a client that requested a delete
    */
   case class Deleted(
-    model: ModelType,
-    value: JsValue
+    model:  ModelType,
+    value:  JsValue
   ) extends ControllerMessage
   implicit val deletedFormat = Json.format[Deleted]
 

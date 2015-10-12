@@ -21,7 +21,7 @@ object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTyp
                         builder
                 }.result()
                 val route = Route(id,actions)
-                Routed(ModelTypes.Vehicle,id,Route.format.writes(route))
+                Routed(ModelTypes.Vehicle,id,Route.writes.writes(route))
             }.orElse(Some(WebSocketMessage.Error("No Vehicle with id: "+id)))
         case x: WebSocketMessage => super.receive(x)
     }
