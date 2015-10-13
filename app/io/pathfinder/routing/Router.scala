@@ -14,6 +14,9 @@ import scala.collection.mutable
 import Function.tupled
 
 object Router {
+    // This can be used to force the initialization of the static code in this class from Java.
+    def init(): Unit = {}
+
     Logger.info("Now initializing Router singleton")
 
     // these should probably be thread safe eventually
