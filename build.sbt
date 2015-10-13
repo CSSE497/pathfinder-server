@@ -38,4 +38,4 @@ maintainer in Docker := "Pathfinder Team"
 dockerRepository := Some("gcr.io/phonic-aquifer-105721")
 dockerExposedPorts := Seq(9000, 9443)
 
-scoverage.ScoverageSbtPlugin.ScoverageKeys.coverageExcludedPackages := "<empty>;controllers\\..*Reverse.*;routes\\..*Routes.*"
+scoverage.ScoverageSbtPlugin.ScoverageKeys.coverageExcludedPackages := "<empty>;controllers\\..*Reverse.*;router\\..*Routes.*"
