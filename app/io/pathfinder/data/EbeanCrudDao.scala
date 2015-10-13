@@ -2,6 +2,7 @@ package io.pathfinder.data
 
 import com.avaje.ebean.Model
 import play.db.ebean.Transactional
+import play.Logger
 import scala.collection.JavaConversions.asScalaBuffer
 
 class EbeanCrudDao[K,M <: Model](protected val finder: Model.Find[K,M]) extends CrudDao[K,M] {
@@ -13,7 +14,8 @@ class EbeanCrudDao[K,M <: Model](protected val finder: Model.Find[K,M]) extends 
 
     final def create(create: Resource[M]): Option[M] = {
         create.create().map {
-            model =>
+            (model: M) =>
+                Logger.info(String.format("EbeanCrudDao inserting new %s: %s", model.getClass.getName, model))
                 model.insert()
                 model
         }
