@@ -88,6 +88,6 @@ class Vehicle() extends Model {
     var capacity: Int = 0
 
     @ManyToOne
-    @Column(nullable=false)
+    @Column
     var cluster: Cluster = null
 }

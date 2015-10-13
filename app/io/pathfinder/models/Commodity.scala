@@ -98,7 +98,7 @@ class Commodity() extends Model {
     @Column(name = "param")
     var param: Int = 0
 
-    @JoinColumn(name="cluster", nullable=false)
-    @ManyToOne(optional=false)
+    @JoinColumn
+    @ManyToOne
     var cluster: Cluster = null
 }

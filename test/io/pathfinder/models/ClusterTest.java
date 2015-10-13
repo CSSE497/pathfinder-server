@@ -69,12 +69,12 @@ public class ClusterTest {
         return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), 0);
     }
 
-    private static <T> scala.collection.immutable.List<T> newList() {
+    private static <T> scala.collection.mutable.Buffer newList() {
         return wrap(new LinkedList<T>());
     }
 
-    private static <T> scala.collection.immutable.List<T> wrap(List<T> list) {
-        return (JavaConversions.<T>asScalaBuffer(list)).toList();
+    private static <T> scala.collection.mutable.Buffer wrap(List<T> list) {
+        return (JavaConversions.<T>asScalaBuffer(list));
     }
 
     public Cluster createClusters() {
@@ -92,15 +92,15 @@ public class ClusterTest {
         vehicle2.save();
         vehicle3.save();
 
-        Cluster cluster4 = Cluster.apply(id_count++, newList(), newList(), newList());
+        Cluster cluster4 = Cluster.apply(id_count++, newList(), newList());
         cluster4.save();
-        Cluster cluster3 = Cluster.apply(id_count++, newList(), newList(), newList());
+        Cluster cluster3 = Cluster.apply(id_count++, newList(), newList());
         cluster3.save();
-        Cluster cluster2 = Cluster.apply(id_count++, wrap(Arrays.asList(cluster3.id())), wrap(Arrays.asList(vehicle3.id())), wrap(Arrays.asList(commodity3.id())));
+        Cluster cluster2 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle3.id())), wrap(Arrays.asList(commodity3.id())));
         cluster2.save();
-        Cluster cluster1 = Cluster.apply(id_count++, wrap(Arrays.asList(cluster2.id())), wrap(Arrays.asList(vehicle2.id())), wrap(Arrays.asList(commodity2.id())));
+        Cluster cluster1 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle2.id())), wrap(Arrays.asList(commodity2.id())));
         cluster1.save();
-        Cluster mainCluster = Cluster.apply(id_count++, wrap(Arrays.asList(cluster1.id(), cluster4.id())), newList(), newList());
+        Cluster mainCluster = Cluster.apply(id_count++, newList(), newList());
         mainCluster.save();
         return mainCluster;
     }
@@ -154,11 +154,8 @@ public class ClusterTest {
             assertEquals(201, result.status());
 
             ObjectNode resultJson = (ObjectNode) bodyForResult(result);
-            assertTrue("db record should have clusters", resultJson.hasNonNull("subClusters"));
             assertTrue("db record should have vehicles", resultJson.hasNonNull("vehicles"));
             assertTrue("db record should have commodities", resultJson.hasNonNull("commodities"));
-            assertTrue("db record should have parent", !resultJson.hasNonNull("parent"));
-
         });
     }
 
@@ -208,36 +205,6 @@ public class ClusterTest {
             Result result = Helpers.route(request);
 
             assertEquals("Get by invalid should return status 404", 404, result.status());
-        });
-    }
-
-    @Test
-    public void putShouldUpdateClusters() {
-        Helpers.running(fakeApp, () -> {
-            long existingId = createClusters().id();
-
-            ObjectNode body = JsonNodeFactory.instance.objectNode();
-            Cluster newCluster = new Cluster();
-            newCluster.subClusters_$eq(newList());
-            JsonNode newClusters = Json.parse(Cluster.format().writes(newCluster).toString());
-
-            RequestBuilder request = new RequestBuilder()
-                    .method(Helpers.PUT)
-                    .uri("/cluster/" + String.valueOf(existingId))
-                    .bodyJson(newClusters);
-            Result result = Helpers.route(request);
-
-            assertEquals("Successful Put should return no content code", 204, result.status());
-
-            Cluster cluster = Cluster.finder().byId(existingId);
-            assertEquals("Commodity PUT changes should persist in the db", 0, cluster.subClusters().size());
-
-            RequestBuilder invalidIdRequest = new RequestBuilder()
-                    .method(Helpers.PUT)
-                    .uri("/cluster/500")
-                    .bodyJson(body);
-            Result invalidIdResult = Helpers.route(invalidIdRequest);
-            assertEquals("Put to invalid id should 404", 404, invalidIdResult.status());
         });
     }
 
