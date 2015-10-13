@@ -7,6 +7,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import play.api.libs.json.JsResult;
 import play.api.libs.json.Json;
+
 import play.mvc.Result;
 import play.test.Helpers;
 import play.mvc.Http.RequestBuilder;
@@ -32,6 +33,7 @@ import java.util.List;
 public class CommodityTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
     private FakeApplication fakeApp;
+    private Cluster cluster;
 
     private static final double TOLERANCE = 0.00001;
     private static final int ID = 13;
@@ -64,6 +66,9 @@ public class CommodityTest {
     @Before
     public void setup() {
         fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase("default"));
+        cluster = new Cluster();
+        cluster.id_$eq(1);
+        cluster.save();
     }
 
     @After
@@ -74,6 +79,7 @@ public class CommodityTest {
     @Test
     public void ebeanModelShouldBeValid() {
         Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0, 1);
+        commodity.cluster_$eq(cluster);
         commodity.save();
         assertEquals(1, Commodity.finder().all().size());
     }
@@ -88,6 +94,7 @@ public class CommodityTest {
             body.put("endLatitude", 8.0);
             body.put("endLongitude", 9.0);
             body.put("param", 42);
+            body.put("clusterId", 1);
 
             RequestBuilder request = new RequestBuilder()
                     .bodyJson(body)
@@ -131,6 +138,7 @@ public class CommodityTest {
             body.put("endLatitude", 3.0);
             body.put("endLongitude", 4.0);
             body.put("param", 5);
+            body.put("clusterId", 1);
 
             RequestBuilder request = new RequestBuilder()
                     .bodyJson(body)
@@ -192,6 +200,8 @@ public class CommodityTest {
     private void populateCommodities() {
         Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, 5);
         Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, 50);
+        commodity1.cluster_$eq(cluster);
+        commodity2.cluster_$eq(cluster);
         commodity1.save();
         commodity2.save();
     }
@@ -321,7 +331,7 @@ public class CommodityTest {
     @Test
     public void testCommodityResourceDeserializesCorrectly() {
         Option<Commodity> result =
-            Commodity.resourceFormat().reads(Json.parse(JSON_PARTIAL_COMMODITY)).get().create();
+            Commodity.resourceFormat().reads(Json.parse(JSON_PARTIAL_COMMODITY)).get().create(cluster);
         assertTrue(result.nonEmpty());
         Commodity actual = result.get();
         assertEquals(START_LATITUDE, actual.startLatitude(), TOLERANCE);

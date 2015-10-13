@@ -1,26 +1,35 @@
 package io.pathfinder.models
 
-import javax.persistence.{Column, Entity, GeneratedValue, GenerationType, Id, ManyToOne}
+import javax.persistence._
 
 import com.avaje.ebean.Model
-import com.fasterxml.jackson.annotation.JsonIgnore
-import io.pathfinder.data.{Resource, EbeanCrudDao}
+
 import io.pathfinder.websockets.WebSocketDao
+import io.pathfinder.data.{ClusterQueries, Resource}
+
 import play.api.libs.json.{Json, Format}
 
 object Commodity {
     val finder: Model.Find[Long,Commodity] = new Model.Finder[Long,Commodity](classOf[Commodity])
-    object Dao extends WebSocketDao[Commodity](finder)
+
+    object Dao extends WebSocketDao[Commodity](finder) with ClusterQueries[Long, Commodity] {
+        override def readByCluster(c: Cluster): Seq[Commodity] = {
+            c.refresh()
+            c.commodities
+        }
+    }
 
     implicit val format: Format[Commodity] = Json.format[Commodity]
     implicit val resourceFormat: Format[CommodityResource] = Json.format[CommodityResource]
 
     case class CommodityResource(
+        id: Option[Long],
         startLatitude:  Option[Double],
         endLatitude: Option[Double],
         startLongitude:  Option[Double],
         endLongitude: Option[Double],
-        param:  Option[Int]
+        param:  Option[Int],
+        clusterId: Option[Long]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
             startLatitude.foreach(c.startLatitude  = _)
@@ -31,17 +40,23 @@ object Commodity {
             Some(c)
         }
 
-        override def create(): Option[Commodity] = {
-            for {
+        def create(cluster: Cluster): Option[Commodity] = for {
                 startLatitude <- startLatitude
                 startLongitude <- startLongitude
                 endLatitude <- endLatitude
                 endLongitude <- endLongitude
                 param <- param
             } yield {
-                Commodity(0, startLatitude, startLongitude, endLatitude, endLongitude, param)
+                val c = Commodity(0, startLatitude, startLongitude, endLatitude, endLongitude, param)
+                c.cluster = cluster
+                c
             }
-        }
+
+        override def create: Option[Commodity] = for {
+            id <- clusterId
+            cluster <- Cluster.Dao.read(id)
+            model <- create(cluster)
+        } yield model
     }
 
     def apply(id: Long, startLatitude: Double, startLongitude: Double, endLatitude: Double,
@@ -62,6 +77,7 @@ object Commodity {
 
 @Entity
 class Commodity() extends Model {
+
     @Id
     @Column(name="id", nullable=false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -81,4 +97,8 @@ class Commodity() extends Model {
 
     @Column(name = "param")
     var param: Int = 0
+
+    @JoinColumn
+    @ManyToOne
+    var cluster: Cluster = null
 }

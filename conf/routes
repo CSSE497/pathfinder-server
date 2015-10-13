@@ -18,5 +18,4 @@ DELETE        /commodity/:id        io.pathfinder.controllers.CommodityControlle
 GET           /cluster              io.pathfinder.controllers.ClusterController.getClusters()
 GET           /cluster/:id          io.pathfinder.controllers.ClusterController.getCluster(id: Long)
 POST          /cluster              io.pathfinder.controllers.ClusterController.createCluster()
-PUT           /cluster/:id          io.pathfinder.controllers.ClusterController.editCluster(id: Long)
 DELETE        /cluster/:id          io.pathfinder.controllers.ClusterController.deleteCluster(id: Long)

@@ -1,51 +1,69 @@
 package io.pathfinder.models
 
-import javax.persistence.{OneToMany, CascadeType, ManyToOne, Id, GenerationType, Column, GeneratedValue, Entity}
+import java.util
+import javax.persistence.{OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
 
 import com.avaje.ebean.Model
 import io.pathfinder.data.{Resource, EbeanCrudDao}
 import play.api.libs.json.{Json, Format}
+import scala.collection.JavaConverters.asScalaBufferConverter
+import scala.collection.mutable
 
 object Cluster {
     val finder: Model.Find[Long, Cluster] = new Model.Finder[Long, Cluster](classOf[Cluster])
     object Dao extends EbeanCrudDao[Long, Cluster](finder)
 
-    val DEFAULT_ID = 0;
+    val DEFAULT_ID = 0
 
     implicit val format: Format[Cluster] = Json.format[Cluster]
     implicit val resourceFormat: Format[ClusterResource] = Json.format[ClusterResource]
 
-    case class ClusterResource(subClusters: Option[List[Long]], vehicles: Option[List[Long]], commodities: Option[List[Long]])
-        extends Resource[Cluster] {
-        /** Updates the specified model with the resource's fields. */
-        override def update(model: Cluster): Option[Cluster] = {
-            subClusters.foreach { ids => model.subClusters ++= ids.map(Cluster.finder.byId) }
-            vehicles.foreach { ids => model.vehicles ++= ids.map(Vehicle.finder.byId) }
-            commodities.foreach { ids => model.commodities ++= ids.map(Commodity.finder.byId) }
-            Some(model)
-        }
+    case class ClusterResource(
+        vehicles: Option[Seq[Vehicle.VehicleResource]],
+        commodities: Option[Seq[Commodity.CommodityResource]]
+    ) extends Resource[Cluster] {
+
+        override def update(model: Cluster): Option[Cluster] = None // Cluster Updates are not supported
 
         /** Creates a new model instance from this resource. */
         override def create(): Option[Cluster] = {
-            Some(Cluster(
-                DEFAULT_ID,
-                subClusters.getOrElse(List()),
-                vehicles.getOrElse(List()),
-                commodities.getOrElse(List())))
+            val model = new Cluster
+            vehicles.foreach(
+                _.foreach {
+                    vehicleResource => model.vehicles += (
+                      for {
+                          id <- vehicleResource.id
+                          model <- Vehicle.Dao.read(id)
+                          update <- vehicleResource.update(model)
+                      } yield update
+                      ).orElse(vehicleResource.create(model)).getOrElse(return None)
+                }
+            )
+            commodities.foreach(
+                _.foreach {
+                    commodityResource => model.commodities += (
+                        for {
+                            id <- commodityResource.id
+                            model <- Commodity.Dao.read(id)
+                            update <- commodityResource.update(model)
+                      } yield update
+                    ).orElse(commodityResource.create(model)).getOrElse(return None)
+                }
+            )
+            Some(model)
         }
     }
 
-    def apply(id: Long, subClusters: List[Long], vehicles: List[Long], commodities: List[Long]): Cluster = {
+    def apply(id: Long, vehicles: Seq[Vehicle], commodities: Seq[Commodity]): Cluster = {
         val c = new Cluster
         c.id = id
-        c.subClusters = subClusters.map(Cluster.finder.byId)
-        c.vehicles = vehicles.map(Vehicle.finder.byId)
-        c.commodities = commodities.map(Commodity.finder.byId)
+        c.vehicles ++= vehicles
+        c.commodities ++= commodities
         c
     }
 
-    def unapply(c: Cluster): Option[(Long, List[Long], List[Long], List[Long])] =
-        Some((c.id, c.subClusters.map(_.id), c.vehicles.map(_.id), c.commodities.map(_.id)))
+    def unapply(c: Cluster): Option[(Long, Seq[Vehicle], Seq[Commodity])] =
+        Some((c.id, c.vehicles, c.commodities))
 }
 
 @Entity
@@ -55,12 +73,12 @@ class Cluster() extends Model {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0
 
-    @OneToMany(mappedBy="parent", cascade=Array(CascadeType.ALL))
-    var subClusters: List[Cluster] = List()
+    @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
+    var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
 
-    @OneToMany(mappedBy = "parent", cascade=Array(CascadeType.ALL))
-    var vehicles: List[Vehicle] = List()
+    @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
+    var commodityList: util.List[Commodity] = new util.ArrayList[Commodity]()
 
-    @OneToMany(mappedBy = "parent", cascade=Array(CascadeType.ALL))
-    var commodities: List[Commodity] = List()
+    def vehicles: mutable.Buffer[Vehicle] = vehicleList.asScala
+    def commodities: mutable.Buffer[Commodity] = commodityList.asScala
 }

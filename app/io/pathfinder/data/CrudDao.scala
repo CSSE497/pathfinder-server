@@ -36,6 +36,16 @@ abstract class CrudDao[K,M] {
     def read(id: K): Option[M]
 
     /**
+     * returns a Right containing the sequence of models from the specified keys,
+     * if a key is missing from the database, a Left with the invalid id is returned
+     */
+    def readAll(ids: TraversableOnce[K]): Either[K,Seq[M]] = Right(
+        ids.foldLeft(Seq.newBuilder[M]){
+            (builder, id) => builder += read(id).getOrElse(return Left(id))
+        }.result()
+    )
+
+    /**
      * returns all of the models as a Seq
      */
     def readAll: Seq[M]

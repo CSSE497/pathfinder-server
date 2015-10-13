@@ -52,31 +52,9 @@ public class ClusterController extends Controller {
             return internalServerError("Error saving cluster to the database: " + e.getMessage());
         } catch (RuntimeException e) {
             e.printStackTrace();
-            Logger.error("Unable to map json to cluster object: " + jsVal.toString());
+            Logger.error("Unable to map json to cluster object: " + jsVal.toString(), e);
             return badRequest("Unable to map json to cluster object: " + jsVal.toString());
         }
-    }
-
-    public Result editCluster(long id) {
-        Cluster cluster = Cluster.finder().byId(id);
-
-        if (cluster == null) {
-            return notFound();
-        }
-
-        ObjectNode clusterJson = (ObjectNode) Json.toJson(cluster);
-        ObjectNode body;
-
-        try {
-            JsonNode json = request().body().asJson();
-            body = (ObjectNode) json;
-        } catch (ClassCastException e) {
-            e.printStackTrace();
-            return badRequest("Cannot cast request body to ObjectNode: " + e.getMessage());
-        }
-        Cluster.resourceFormat().reads(play.api.libs.json.Json.parse(body.toString())).get().update(cluster);
-        cluster.save();
-        return noContent();
     }
 
     public Result deleteCluster(long id) {
