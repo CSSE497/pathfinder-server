@@ -14,6 +14,7 @@ import static org.junit.Assert.assertTrue;
 public class VehicleTest {
     private final String JSON_VEHICLE = "{\"id\":1,\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7}";
     private final String JSON_PARTIAL_VEHICLE = "{\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7}";
+    private final Cluster cluster = new Cluster();
 
     @Test
     public void testVehicleDeserializesWithoutErrors() {
@@ -39,7 +40,7 @@ public class VehicleTest {
     @Test
     public void testVehicleResourceDeserializesCorrectly() {
         Option<Vehicle> result =
-            Vehicle.resourceFormat().reads(Json.parse(JSON_PARTIAL_VEHICLE)).get().create();
+            Vehicle.resourceFormat().reads(Json.parse(JSON_PARTIAL_VEHICLE)).get().create(cluster);
         assertTrue(result.nonEmpty());
         Vehicle vehicle = result.get();
         assertEquals(7, vehicle.capacity());

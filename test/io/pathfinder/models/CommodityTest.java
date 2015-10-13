@@ -331,7 +331,7 @@ public class CommodityTest {
     @Test
     public void testCommodityResourceDeserializesCorrectly() {
         Option<Commodity> result =
-            Commodity.resourceFormat().reads(Json.parse(JSON_PARTIAL_COMMODITY)).get().create();
+            Commodity.resourceFormat().reads(Json.parse(JSON_PARTIAL_COMMODITY)).get().create(cluster);
         assertTrue(result.nonEmpty());
         Commodity actual = result.get();
         assertEquals(START_LATITUDE, actual.startLatitude(), TOLERANCE);
