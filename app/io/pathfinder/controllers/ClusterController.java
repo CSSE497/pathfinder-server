@@ -57,28 +57,6 @@ public class ClusterController extends Controller {
         }
     }
 
-    public Result editCluster(long id) {
-        Cluster cluster = Cluster.finder().byId(id);
-
-        if (cluster == null) {
-            return notFound();
-        }
-
-        ObjectNode clusterJson = (ObjectNode) Json.toJson(cluster);
-        ObjectNode body;
-
-        try {
-            JsonNode json = request().body().asJson();
-            body = (ObjectNode) json;
-        } catch (ClassCastException e) {
-            e.printStackTrace();
-            return badRequest("Cannot cast request body to ObjectNode: " + e.getMessage());
-        }
-        Cluster.resourceFormat().reads(play.api.libs.json.Json.parse(body.toString())).get().update(cluster);
-        cluster.save();
-        return noContent();
-    }
-
     public Result deleteCluster(long id) {
         Cluster cluster = Cluster.finder().byId(id);
 
