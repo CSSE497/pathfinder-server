@@ -37,3 +37,5 @@ version in Docker := "0.1"
 maintainer in Docker := "Pathfinder Team"
 dockerRepository := Some("gcr.io/phonic-aquifer-105721")
 dockerExposedPorts := Seq(9000, 9443)
+
+scoverage.ScoverageSbtPlugin.ScoverageKeys.coverageExcludedPackages := "<empty>;controllers\\..*Reverse.*"
