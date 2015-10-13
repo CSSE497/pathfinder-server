@@ -73,6 +73,9 @@ class Cluster() extends Model {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0
 
+    @Column
+    var authenticationToken: String = "top secret"
+
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
 
@@ -81,4 +84,10 @@ class Cluster() extends Model {
 
     def vehicles: mutable.Buffer[Vehicle] = vehicleList.asScala
     def commodities: mutable.Buffer[Commodity] = commodityList.asScala
+
+    override def toString = String.format(
+        "Cluster(id: %s, vehicles: %s, commodities: %s)",
+        id.toString,
+        util.Arrays.toString(vehicleList.toArray),
+        util.Arrays.toString(commodityList.toArray))
 }
