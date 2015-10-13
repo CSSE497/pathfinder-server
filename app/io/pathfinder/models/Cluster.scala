@@ -30,24 +30,24 @@ object Cluster {
             val model = new Cluster
             vehicles.foreach(
                 _.foreach {
-                    vr => model.vehicles += (
+                    vehicleResource => model.vehicles += (
                       for {
-                          id <- vr.id
-                          mod <- Vehicle.Dao.read(id)
-                          upd <- vr.update(mod)
-                      } yield upd
-                      ).orElse(vr.create(model)).getOrElse(return None)
+                          id <- vehicleResource.id
+                          model <- Vehicle.Dao.read(id)
+                          update <- vehicleResource.update(model)
+                      } yield update
+                      ).orElse(vehicleResource.create(model)).getOrElse(return None)
                 }
             )
             commodities.foreach(
                 _.foreach {
-                    cr => model.commodities += (
+                    commodityResource => model.commodities += (
                         for {
-                            id <- cr.id
-                            mod <- Commodity.Dao.read(id)
-                            upd <- cr.update(mod)
-                      } yield upd
-                    ).orElse(cr.create(model)).getOrElse(return None)
+                            id <- commodityResource.id
+                            model <- Commodity.Dao.read(id)
+                            update <- commodityResource.update(model)
+                      } yield update
+                    ).orElse(commodityResource.create(model)).getOrElse(return None)
                 }
             )
             Some(model)

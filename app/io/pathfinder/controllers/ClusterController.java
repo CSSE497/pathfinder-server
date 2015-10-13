@@ -48,7 +48,7 @@ public class ClusterController extends Controller {
             return created(Cluster.format().writes(cluster).toString());
         } catch (PersistenceException e) {
             e.printStackTrace();
-            Logger.error(String.format("Error saving cluster to the database: %s", e));
+            Logger.error(String.format("Error saving cluster to the database: %s", e.getMessage()));
             return internalServerError("Error saving cluster to the database: " + e.getMessage());
         } catch (RuntimeException e) {
             e.printStackTrace();
