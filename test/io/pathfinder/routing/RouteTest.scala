@@ -3,7 +3,6 @@ package io.pathfinder.routing
 import io.pathfinder.models.Commodity
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
 import org.scalatestplus.play.PlaySpec
-import io.pathfinder.routing.{Route, Action}
 import play.api.libs.json.Json
 
 class RouteTest extends PlaySpec {
