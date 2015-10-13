@@ -4,7 +4,7 @@ version := "1.0-SNAPSHOT"
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala, PlayEbean, PlayJava)
 
-scalaVersion := "2.11.6"
+scalaVersion := "2.11.7"
 
 libraryDependencies ++= Seq(
   jdbc,
@@ -18,7 +18,9 @@ libraryDependencies ++= Seq(
   "postgresql" % "postgresql" % "9.1-901-1.jdbc4",
   "org.scalatest" %% "scalatest" % "2.2.1" % "test",
   "org.scalatestplus" %% "play" % "1.4.0-M3" % "test",
-  "org.postgresql" % "postgresql" % "9.4-1203-jdbc42"
+  "org.postgresql" % "postgresql" % "9.4-1203-jdbc42",
+  "com.typesafe.akka" % "akka-testkit_2.11" % "2.4.0",
+  "com.typesafe.akka" % "akka-slf4j_2.11" % "2.4.0"
 )
 
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-v", "-q", "-a")

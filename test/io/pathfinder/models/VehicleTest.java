@@ -1,5 +1,6 @@
 package io.pathfinder.models;
 
+import io.pathfinder.BaseAppTest;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -11,10 +12,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(JUnit4.class)
-public class VehicleTest {
+public class VehicleTest extends BaseAppTest {
     private final String JSON_VEHICLE = "{\"id\":1,\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7}";
     private final String JSON_PARTIAL_VEHICLE = "{\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7}";
-    private final Cluster cluster = new Cluster();
 
     @Test
     public void testVehicleDeserializesWithoutErrors() {
@@ -46,5 +46,12 @@ public class VehicleTest {
         assertEquals(7, vehicle.capacity());
         assertEquals(0.123, vehicle.latitude(), 0.01);
         assertEquals(4.567, vehicle.longitude(), 0.01);
+    }
+
+    @Test
+    public void testGeneratedId() {
+        Vehicle actual = Vehicle.resourceFormat().reads(Json.parse(JSON_PARTIAL_VEHICLE)).get().create(cluster).get();
+        actual.insert();
+        assertEquals(1, actual.id());
     }
 }
