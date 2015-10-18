@@ -30,7 +30,16 @@ class SocketMessagePusher[K] extends EventBusActor with ActorEventBus with Looku
     override protected def mapSize(): Int = 16
 
     override def subscribe(ref: ActorRef, classifier: Classifier): Boolean = {
-        Logger.info("websocket "+ref+" subscribed to : "+classifier)
+        Logger.info("websocket "+ref+" subscribed to: "+classifier+" at "+self)
         super.subscribe(ref, classifier)
+    }
+
+    override def unsubscribe(ref: ActorRef, classifier: Classifier): Boolean = {
+        Logger.info("Websocket "+ref+" unsubscribed from: "+classifier+" for "+self)
+        super.unsubscribe(ref, classifier)
+    }
+
+    override def unsubscribe(ref: ActorRef): Boolean = {
+        Logger.info("Websocket "+ref+" unsubscribed from: "+self)
     }
 }

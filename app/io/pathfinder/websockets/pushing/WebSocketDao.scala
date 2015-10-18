@@ -9,7 +9,7 @@ import io.pathfinder.data.{CrudDao, EbeanCrudDao, ObserverDao}
 import io.pathfinder.models.{HasId, HasCluster}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.WebSocketMessage.{Updated, Deleted, Created}
-import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{Subscribe, Publish}
+import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{UnsubscribeAll, Unsubscribe, Subscribe, Publish}
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.libs.json.Writes
@@ -60,11 +60,24 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         Router.ref      ! Publish((clusterId,(modelType, Events.Created, model)))
     }
 
-    def subscribeByCluster(clusterId: Long, client: ActorRef): Unit = {
+    def subscribeByClusterId(clusterId: Long, client: ActorRef): Unit = {
         byClusterPusher ! Subscribe(client, clusterId)
     }
 
     def subscribeById(id: Long, client: ActorRef): Unit = {
         byIdPusher ! Subscribe(client, id)
+    }
+
+    def unsubscribeById(id: Long, client: ActorRef): Unit = {
+        byIdPusher ! Unsubscribe(client, id)
+    }
+
+    def unsubscribeByClusterId(clusterId: Long, client: ActorRef): Unit = {
+        byClusterPusher ! Unsubscribe(client, clusterId)
+    }
+
+    def unsubscribe(client: ActorRef): Unit = {
+        byIdPusher ! UnsubscribeAll(client)
+        byClusterPusher ! UnsubscribeAll(client)
     }
 }

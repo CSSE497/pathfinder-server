@@ -3,7 +3,7 @@ package io.pathfinder.websockets
 import akka.actor.{Props, Actor, ActorRef}
 import io.pathfinder.models.{HasId, HasCluster, Vehicle, Commodity}
 import io.pathfinder.websockets.ModelTypes.ModelType
-import io.pathfinder.websockets.WebSocketMessage.{UnknownMessage, Error, UnSubscribe, Subscribe, Subscribed, ControllerMessage}
+import io.pathfinder.websockets.WebSocketMessage.{Unsubscribed, Unsubscribe, UnknownMessage, Error, UnSubscribe, Subscribe, Subscribed, ControllerMessage}
 import io.pathfinder.websockets.pushing.{PushSubscriber, WebSocketDao}
 
 import play.Logger
@@ -52,8 +52,26 @@ class WebSocketActor (
                             }
                         }.getOrElse(Error("Subscribe requires either a model id or a cluster id"))
                     }.getOrElse(Error ("Can only subscribe to vehicles or commodities"))
-                case UnSubscribe(cluster, model, id) =>
-                    client ! Error("Not Implemented")
+                case Unsubscribe(None, None, None) =>
+                    observers.foreach(_._2.unsubscribe(client))
+                    client ! Unsubscribed(None,None,None)
+                case Unsubscribe(Some(cId), None, None) =>
+                    observers.foreach(_._2.unsubscribeByClusterId(cId, client))
+                    client ! Unsubscribed(Some(cId),None,None)
+                case Unsubscribe(Some(cId), Some(model), None) =>
+                    client ! observers.get(model).map {
+                        obs =>
+                            obs.unsubscribeByClusterId(cId, client)
+                            Unsubscribed(Some(cId), Some(model), None)
+                    }.getOrElse(Error("Cannot unsubscribe for model: "+model+" which has no support for subscriptions"))
+                case Unsubscribe(None, Some(model), Some(id)) =>
+                    client ! observers.get(model).map {
+                        obs =>
+                            obs.unsubscribeById(id, client)
+                            Unsubscribed(None, Some(model), Some(id))
+                    }.getOrElse(Error("Cannoth unsubscribe for model: "+model+"which has no support for subscriptions"))
+                case u: Unsubscribe =>
+                    client ! Error("An unsubscribe message must either have a model id and model type, cluster id and model type, a cluster id, or be empty")
                 case UnknownMessage(value) => client ! Error("Received unknown message: " + value.toString)
                 case x => client ! Error("received unknown value: "+ x.toString)
             }
