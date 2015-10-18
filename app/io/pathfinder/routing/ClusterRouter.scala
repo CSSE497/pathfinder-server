@@ -6,6 +6,7 @@ import io.pathfinder.models.Cluster
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
 import io.pathfinder.websockets.WebSocketMessage.Routed
 import io.pathfinder.websockets.pushing.EventBusActor
+import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Publish
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.libs.json.JsValue
@@ -40,7 +41,7 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
     override protected def mapSize(): Int = 16
 
     override def receive: Receive = {
-        case tup: (_, _, _) => recalculate() // calling refresh will update the cluster model instance
+        case publish: Publish => recalculate() // calling refresh will update the cluster model instance
         case _Else => super.receive(_Else)
     }
 

@@ -43,11 +43,11 @@ class WebSocketActor (
                     client ! observers.get(model).map {
                         obs =>
                             id.map { id =>
-                                obs.subscribeById(id, self)
+                                obs.subscribeById(id, client)
                                 Subscribed(cluster, model, Some(id))
                             }.orElse {
                                 cluster.map { id =>
-                                    obs.subscribeByCluster(id, self)
+                                    obs.subscribeByCluster(id, client)
                                     Subscribed(cluster, model, None)
                             }
                         }.getOrElse(Error("Subscribe requires either a model id or a cluster id"))
