@@ -1,38 +1,25 @@
 package io.pathfinder.models
 
-
-import akka.actor.{Props, ActorRef}
 import com.avaje.ebean.Model
-import io.pathfinder.websockets.{ModelTypes, WebSocketDao}
+import io.pathfinder.websockets.ModelTypes
 import javax.persistence.{ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
-import io.pathfinder.websockets.pushing.{SocketMessagePusher, ByIdPusher, EventBusActor, PushByClusterDao, PushByIdDao, ByClusterPusher}
+import io.pathfinder.websockets.pushing.WebSocketDao
 import play.api.libs.json.{Writes, Format, Json}
-import io.pathfinder.data.{ObserverDao, ClusterQueries, Resource}
+import io.pathfinder.data.{ClusterQueries, Resource}
 
 object Vehicle {
 
     val finder: Model.Find[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
 
-    object Dao extends ObserverDao[Vehicle](finder) with ClusterQueries[Long, Vehicle] with PushByIdDao[Vehicle] with PushByClusterDao[Vehicle] {
-        
-        class ByIdEventBus extends EventBusActor with SocketMessagePusher with ByIdPusher {
-            override type Model = Vehicle
-        }
-
+    object Dao extends WebSocketDao[Vehicle](finder) with ClusterQueries[Long, Vehicle] {
         override def readByCluster(c: Cluster): Seq[Vehicle] = {
             c.refresh()
             c.vehicles
         }
 
-        override def byIdEventBus: ActorRef
+        override def modelType: ModelTypes.Value = ModelTypes.Vehicle
 
-        override def byClusterEventBus: ActorRef = ???
-
-        override def writer: Writes[Vehicle] = ???
-
-        override def modelType: ModelTypes.Value = ???
-
-        override def routers: ActorRef = ???
+        override def writer: Writes[Vehicle] = Vehicle.format
     }
 
     implicit val format: Format[Vehicle] = Json.format[Vehicle]

@@ -4,10 +4,11 @@ import javax.persistence._
 
 import com.avaje.ebean.Model
 
-import io.pathfinder.websockets.WebSocketDao
 import io.pathfinder.data.{ClusterQueries, Resource}
+import io.pathfinder.websockets.ModelTypes
+import io.pathfinder.websockets.pushing.WebSocketDao
 
-import play.api.libs.json.{Json, Format}
+import play.api.libs.json.{Writes, Json, Format}
 
 object Commodity {
     val finder: Model.Find[Long,Commodity] = new Model.Finder[Long,Commodity](classOf[Commodity])
@@ -17,6 +18,10 @@ object Commodity {
             c.refresh()
             c.commodities
         }
+
+        override def modelType: ModelTypes.Value = ModelTypes.Commodity
+
+        override def writer: Writes[Commodity] = Commodity.format
     }
 
     implicit val format: Format[Commodity] = Json.format[Commodity]

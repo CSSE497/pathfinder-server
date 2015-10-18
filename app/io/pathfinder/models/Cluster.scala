@@ -26,7 +26,7 @@ object Cluster {
         override def update(model: Cluster): Option[Cluster] = None // Cluster Updates are not supported
 
         /** Creates a new model instance from this resource. */
-        override def create(): Option[Cluster] = {
+        override def create: Option[Cluster] = {
             val model = new Cluster
             vehicles.foreach(
                 _.foreach {

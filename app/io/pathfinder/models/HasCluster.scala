@@ -1,7 +1,7 @@
 package io.pathfinder.models
 
-import play.db.ebean.Model
+import com.avaje.ebean.Model
 
 trait HasCluster extends Model {
-  def cluster: Cluster
+    def cluster: Cluster
 }
