@@ -37,7 +37,6 @@ object WebSocketMessage {
   case class UnSubscribe(
     cluster: Option[Long],
     model:   Option[ModelType],
-    event:   Option[Events.Value],
     id:      Option[Long]
   ) extends WebSocketMessage
   implicit val unSubscribeFormat = Json.format[UnSubscribe]
@@ -46,9 +45,8 @@ object WebSocketMessage {
    * Sent by the client to subscribe to push notifications
    */
   case class Subscribe(
-    cluster: Long,
-    model:   Option[ModelType],
-    event:   Option[Event],
+    cluster: Option[Long],
+    model:   ModelType,
     id:      Option[Long]
   ) extends WebSocketMessage
   implicit val subscribeFormat = Json.format[Subscribe]
@@ -150,9 +148,8 @@ object WebSocketMessage {
    * Message sent to a client that requested a subscribe
    */
   case class Subscribed(
-    cluster: Long,
-    model:   Option[ModelType],
-    event:   Option[Events.Value],
+    cluster: Option[Long],
+    model:   ModelType,
     id:      Option[Long]
   ) extends WebSocketMessage
   implicit val subscribedFormat = Json.format[Subscribed]
@@ -161,9 +158,8 @@ object WebSocketMessage {
    * Message sent to a client that requested to unsubscribe
    */
   case class UnSubscribed(
-    cluster: Long,
+    cluster: Option[Long],
     model:   Option[ModelType],
-    event:   Option[Events.Value],
     id:      Option[Long]
   ) extends WebSocketMessage
   implicit val unSubscribedFormat = Json.format[UnSubscribed]

@@ -4,7 +4,7 @@ import io.pathfinder.models.{Commodity, Cluster, Vehicle}
 import io.pathfinder.routing.Action.{Start, DropOff, PickUp}
 import io.pathfinder.routing.{Action, Route}
 import io.pathfinder.websockets.{WebSocketMessage, ModelTypes}
-import io.pathfinder.websockets.WebSocketMessage.{Route => RouteMsg, Routed}
+import io.pathfinder.websockets.WebSocketMessage.{Route => RouteMsg, Subscribe, Routed}
 import scala.collection.JavaConversions.asScalaBuffer
 /**
  * manages vehicle API calls
@@ -26,4 +26,3 @@ object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTyp
         case x: WebSocketMessage => super.receive(x)
     }
 }
-
