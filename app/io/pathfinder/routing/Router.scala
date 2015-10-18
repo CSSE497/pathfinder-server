@@ -4,9 +4,10 @@ import akka.actor.{Props, ActorRef}
 import akka.event.{LookupClassification, ActorEventBus}
 import com.avaje.ebean.Model
 import io.pathfinder.config.Global
+import io.pathfinder.models.{Commodity, Vehicle}
 import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage
-import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Publish
+import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{Subscribe, Publish}
 import io.pathfinder.websockets.{ModelTypes, Events}
 
 object Router {
@@ -15,12 +16,27 @@ object Router {
     def init(): Unit = {}
     abstract sealed class RouterMessage
     val ref: ActorRef = Global.actorSystem.actorOf(Props(classOf[Router]))
+    object RouteSubscriber {
+        def subscribe(client: ActorRef, model: ModelTypes.Value, id: Long): Boolean = {
+            val cluster = model match {
+                case ModelTypes.Vehicle =>
+                    Vehicle.Dao.read(id).getOrElse(return false).cluster
+                case ModelTypes.Commodity =>
+                    Commodity.Dao.read(id).getOrElse(return false).cluster
+                case ModelTypes.Cluster =>
+                    client ! Publish(id, Subscribe(client, (ModelTypes.Cluster, id)))
+                    return true
+            }
+            client ! Publish(cluster.id, Subscribe(client, (model, id)))
+            true
+        }
+    }
 }
 
 class Router extends EventBusActor with ActorEventBus with LookupClassification {
 
-    override type Classifier = Long
-    override type Event = (Long, EventBusMessage)
+    override type Classifier = Long // cluster id
+    override type Event = (Long, EventBusMessage) // cluster id and message
 
     override protected def classify(event: Event): Classifier = event._1
 
