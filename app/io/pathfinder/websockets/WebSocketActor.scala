@@ -1,10 +1,10 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.{HasId, HasCluster, Vehicle, Commodity}
+import io.pathfinder.models.{Vehicle, Commodity}
 import io.pathfinder.websockets.ModelTypes.ModelType
-import io.pathfinder.websockets.WebSocketMessage.{Unsubscribed, Unsubscribe, UnknownMessage, Error, UnSubscribe, Subscribe, Subscribed, ControllerMessage}
-import io.pathfinder.websockets.pushing.{PushSubscriber, WebSocketDao}
+import io.pathfinder.websockets.WebSocketMessage.{Unsubscribed, Unsubscribe, UnknownMessage, Error, Subscribe, Subscribed, ControllerMessage}
+import io.pathfinder.websockets.pushing.PushSubscriber
 
 import play.Logger
 import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
