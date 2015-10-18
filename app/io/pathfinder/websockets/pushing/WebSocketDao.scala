@@ -18,7 +18,7 @@ import play.api.libs.json.Writes
  * this class listens for changed to models so that it can push the changes to registered websocket clients
  */
 
-abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) extends ObserverDao(dao) {
+abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) extends ObserverDao(dao) with PushSubscriber {
 
     def this(find: Find[Long, V]) = this(new EbeanCrudDao[Long, V](find))
 

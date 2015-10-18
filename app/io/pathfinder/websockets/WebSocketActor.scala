@@ -1,10 +1,10 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.{Vehicle, Commodity}
+import io.pathfinder.models.{HasId, HasCluster, Vehicle, Commodity}
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage.{UnknownMessage, Error, UnSubscribe, Subscribe, Subscribed, ControllerMessage}
-import io.pathfinder.websockets.pushing.WebSocketDao
+import io.pathfinder.websockets.pushing.{PushSubscriber, WebSocketDao}
 
 import play.Logger
 import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
@@ -16,7 +16,7 @@ object WebSocketActor {
         ModelTypes.Commodity -> CommoditySocketController
     )
 
-    val observers: Map[ModelType, WebSocketDao[_]] = Map(
+    val observers: Map[ModelType, PushSubscriber] = Map(
         ModelTypes.Vehicle -> Vehicle.Dao,
         ModelTypes.Commodity -> Commodity.Dao
     )
@@ -31,7 +31,7 @@ object WebSocketActor {
 class WebSocketActor (
     client: ActorRef,
     controllers: Map[ModelType, WebSocketController],
-    observers: Map[ModelType, WebSocketDao[_]]
+    observers: Map[ModelType, PushSubscriber]
 ) extends Actor {
 
     override def receive = {
@@ -39,25 +39,23 @@ class WebSocketActor (
             Logger.info("Received Socket Message " + m)
             m match {
                 case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
-                case Subscribe(cluster, model, id) => {
+                case Subscribe(cluster, model, id) =>
                     client ! observers.get(model).map {
-                        dao =>
-                            id.map(
-                                dao.subscribeById(_, self)
-                                  Subscribed(cluster, model, id)
-                            ).orElse(
-                                cluster.map(
-                                    dao.subscribeByCluster(_, self)
-                                      Subscribed(cluster, model, None)
-                                )
-                            ).getOrElse Error ("Subscribe requires either a model id or a cluster id")
-                    }.getOrElse Error ("Can only subscribe to vehicles or commodities")
-                }
-
-                case UnSubscribe(cluster, model, id) => {
+                        obs =>
+                            id.map { id =>
+                                obs.subscribeById(id, self)
+                                Subscribed(cluster, model, Some(id))
+                            }.orElse {
+                                cluster.map { id =>
+                                    obs.subscribeByCluster(id, self)
+                                    Subscribed(cluster, model, None)
+                            }
+                        }.getOrElse(Error("Subscribe requires either a model id or a cluster id"))
+                    }.getOrElse(Error ("Can only subscribe to vehicles or commodities"))
+                case UnSubscribe(cluster, model, id) =>
                     client ! Error("Not Implemented")
-                }
                 case UnknownMessage(value) => client ! Error("Received unknown message: " + value.toString)
+                case x => client ! Error("received unknown value: "+ x.toString)
             }
         }
     }

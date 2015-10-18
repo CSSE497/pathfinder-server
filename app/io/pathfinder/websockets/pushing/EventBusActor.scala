@@ -17,7 +17,7 @@ object EventBusActor {
 
 abstract class EventBusActor extends Actor with ActorEventBus {
 
-    override def receive: Receive = super.receive.orElse {
+    override def receive: Receive = {
         case Subscribe(sub, to)     => subscribe(sub, to.asInstanceOf[Classifier])
         case UnSubscribe(sub, from) => unsubscribe(sub, from.asInstanceOf[Classifier])
         case UnSubscribeAll(sub)    => unsubscribe(sub)
