@@ -40,7 +40,7 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
     override protected def mapSize(): Int = 16
 
     override def receive: Receive = {
-        case tup: (ModelTypes.Value, Events.Value, AnyRef) => recalculate() // calling refresh will update the cluster model instance
+        case tup: (_, _, _) => recalculate() // calling refresh will update the cluster model instance
         case _Else => super.receive(_Else)
     }
 
