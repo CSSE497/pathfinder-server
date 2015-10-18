@@ -33,12 +33,41 @@ activator docker:publishLocal
 docker run -p 9000:9000 pathfinder-server:1.0-SNAPSHOT
 ```
 
-#### Publis to GCP Docker server
+#### Publish new release to GCP Docker server
 
-```
-activator docker:publish
-gcloud docker push beta.gcr.io/${PROJECT_ID}/pathfinder-server
-```
+1. Increase the version number in `build.sbt` and tag the repository
+
+    ```
+    vi build.sbt
+    git tag -a v0.1.1
+    git push --tag
+    ```
+
+2. Ensure that Docker is up and running
+
+    ```
+    docker-machine start default
+    eval "$(docker-machine env default)"
+    ```
+
+3. Authenticate Docker to GCR
+
+    ```
+    docker login -e <email> -u _token -p "$(gcloud auth print-access-token)" https://beta.gcr.io
+    ```
+
+
+4. Build the image and push it to GCR (as defined in build.sbt)
+
+    ```
+    activator docker:publish
+    ```
+
+5. Update the pods
+
+    ```
+    kubectl rolling-update 
+    ```
 
 ### Tests
 
