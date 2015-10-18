@@ -33,9 +33,9 @@ routesGenerator := InjectedRoutesGenerator
 
 // Docker configuration
 packageName in Docker := "pathfinder-server"
-version in Docker := "0.1"
+version in Docker := "0.1.1"
 maintainer in Docker := "Pathfinder Team"
-dockerRepository := Some("gcr.io/phonic-aquifer-105721")
+dockerRepository := Some("beta.gcr.io/phonic-aquifer-105721")
 dockerExposedPorts := Seq(9000, 9443)
 
 scoverage.ScoverageSbtPlugin.ScoverageKeys.coverageExcludedPackages := "<empty>;controllers\\..*Reverse.*;router\\..*Routes.*"

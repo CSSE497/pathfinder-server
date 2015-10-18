@@ -37,7 +37,7 @@ docker run -p 9000:9000 pathfinder-server:1.0-SNAPSHOT
 
 ```
 activator docker:publish
-gcloud docker push gcr.io/${PROJECT_ID}/pathfinder-server
+gcloud docker push beta.gcr.io/${PROJECT_ID}/pathfinder-server
 ```
 
 ### Tests
