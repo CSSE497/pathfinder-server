@@ -76,7 +76,7 @@ object Commodity {
 }
 
 @Entity
-class Commodity() extends Model {
+class Commodity() extends Model with HasId with HasCluster {
 
     @Id
     @Column(name="id", nullable=false)

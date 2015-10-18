@@ -67,7 +67,7 @@ object Cluster {
 }
 
 @Entity
-class Cluster() extends Model {
+class Cluster() extends Model with HasId {
     @Id
     @Column(nullable = false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
