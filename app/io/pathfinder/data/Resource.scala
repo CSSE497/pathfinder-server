@@ -15,5 +15,5 @@ trait Resource[M] {
    * creates a new model instance from this resource
    * @return
    */
-  def create(): Option[M]
+  def create: Option[M]
 }
