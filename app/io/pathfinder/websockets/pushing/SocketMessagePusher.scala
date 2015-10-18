@@ -39,7 +39,8 @@ class SocketMessagePusher[K] extends EventBusActor with ActorEventBus with Looku
         super.unsubscribe(ref, classifier)
     }
 
-    override def unsubscribe(ref: ActorRef): Boolean = {
+    override def unsubscribe(ref: ActorRef): Unit = {
         Logger.info("Websocket "+ref+" unsubscribed from: "+self)
+        super.unsubscribe(ref)
     }
 }
