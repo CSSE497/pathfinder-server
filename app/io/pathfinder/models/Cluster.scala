@@ -4,14 +4,29 @@ import java.util
 import javax.persistence.{OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
 
 import com.avaje.ebean.Model
-import io.pathfinder.data.{Resource, EbeanCrudDao}
+import io.pathfinder.data.{ObserverDao, Resource}
+import io.pathfinder.routing.Router
+import io.pathfinder.websockets.Events
 import play.api.libs.json.{Json, Format}
 import scala.collection.JavaConverters.asScalaBufferConverter
 import scala.collection.mutable
 
 object Cluster {
     val finder: Model.Find[Long, Cluster] = new Model.Finder[Long, Cluster](classOf[Cluster])
-    object Dao extends EbeanCrudDao[Long, Cluster](finder)
+    object Dao extends ObserverDao[Cluster](finder) {
+
+        override protected def onCreated(model: Cluster): Unit = {
+            Router.ref ! (Events.Created, model)
+        }
+
+        override protected def onUpdated(model: Cluster): Unit = {
+            // clusters do not get updated
+        }
+
+        override protected def onDeleted(model: Cluster): Unit = {
+            Router.ref ! (Events.Deleted, model)
+        }
+    }
 
     val DEFAULT_ID = 0
 

@@ -4,7 +4,7 @@ import akka.actor.{Props, ActorRef}
 import akka.event.{LookupClassification, ActorEventBus}
 import com.avaje.ebean.Model
 import io.pathfinder.config.Global
-import io.pathfinder.models.{Commodity, Vehicle}
+import io.pathfinder.models.{Cluster, Commodity, Vehicle}
 import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{Subscribe, Publish}
@@ -35,6 +35,29 @@ object Router {
 
 class Router extends EventBusActor with ActorEventBus with LookupClassification {
 
+    if(Router.ref != self){
+        throw new Error("Router Actor must be a singleton")
+    }
+
+    // populate the cluster routers
+    Cluster.Dao.readAll.foreach{
+        cluster =>
+            subscribe(
+                Global.actorSystem.actorOf(ClusterRouter.props(cluster)),
+                cluster.id
+            )
+    }
+
+    override def receive: Receive = {
+        case (Events.Created, cluster: Cluster) =>
+            subscribe(Global.actorSystem.actorOf(ClusterRouter.props(cluster)), cluster.id)
+        case (Events.Deleted, cluster: Cluster) =>
+            subscribers.remove(cluster.id).foreach(
+                _.foreach(Global.actorSystem.stop)
+            )
+        case _Else => super.receive(_Else)
+    }
+
     override type Classifier = Long // cluster id
     override type Event = (Long, EventBusMessage) // cluster id and message
 
@@ -43,11 +66,6 @@ class Router extends EventBusActor with ActorEventBus with LookupClassification 
     override protected def mapSize(): Int = 16
 
     override protected def publish(event: Event, subscriber: ActorRef): Unit = subscriber ! event
-
-    override def receive: Receive = {
-        case Publish((id: Long, event: Events.Value, model: Model)) => publish(id, event, model)
-        case _Else => super.receive(_Else)
-    }
 
     def publish(clusterId: Long, event: Events.Value, model: Model): Unit ={
         publish((clusterId, Publish((event, model))))

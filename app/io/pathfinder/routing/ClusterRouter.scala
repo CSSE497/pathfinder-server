@@ -28,6 +28,11 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
         subscriber ! event._2
     }
 
+    override def subscribe(client: ActorRef, c: Classifier): Boolean = {
+        Logger.info("Websokcet: "+ client+" subscribed to route updates for: "+c)
+        super.subscribe(client, c)
+    }
+
     def publish(route: Route): Unit ={
         val routeJson: JsValue = Route.writes.writes(route)
         val vehicleJson: JsValue = Vehicle.format.writes(route.vehicle)
@@ -43,7 +48,7 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
     override protected def mapSize(): Int = 16
 
     override def receive: Receive = {
-        case publish: Publish => recalculate() // calling refresh will update the cluster model instance
+        case tup: (Long,Publish) => recalculate() // calling refresh will update the cluster model instance
         case _Else => super.receive(_Else)
     }
 
