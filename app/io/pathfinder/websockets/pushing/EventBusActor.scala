@@ -8,10 +8,10 @@ object EventBusActor {
     abstract sealed class EventBusMessage
 
     object EventBusMessage {
-        case class Subscribe(subscriber: ActorRef, to: Any) extends EventBusMessage
-        case class Unsubscribe(subscriber: ActorRef, from: Any) extends EventBusMessage
+        case class Subscribe[C](subscriber: ActorRef, to: C) extends EventBusMessage
+        case class Unsubscribe[C](subscriber: ActorRef, from: C) extends EventBusMessage
         case class UnsubscribeAll(subscriber: ActorRef) extends EventBusMessage
-        case class Publish(event: Any) extends EventBusMessage
+        case class Publish[E](event: E) extends EventBusMessage
     }
 }
 

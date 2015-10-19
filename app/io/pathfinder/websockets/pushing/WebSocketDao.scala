@@ -7,6 +7,7 @@ import com.avaje.ebean.Model.Find
 import io.pathfinder.config.Global
 import io.pathfinder.data.{CrudDao, EbeanCrudDao, ObserverDao}
 import io.pathfinder.models.{HasId, HasCluster}
+import io.pathfinder.routing.ClusterRouter.Recalculate
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.WebSocketMessage.{Updated, Deleted, Created}
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{UnsubscribeAll, Unsubscribe, Subscribe, Publish}
@@ -37,7 +38,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
-        Router.ref      ! Publish((clusterId,(modelType, Events.Created, model)))
+        Router.ref      ! Publish((clusterId, Recalculate))
     }
 
     protected def onDeleted(model: V): Unit = {
@@ -47,7 +48,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
-        Router.ref      ! Publish((clusterId,(modelType, Events.Created, model)))
+        Router.ref      ! Publish((clusterId, Recalculate))
     }
 
     protected def onUpdated(model: V): Unit = {
@@ -57,7 +58,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
-        Router.ref      ! Publish((clusterId,(modelType, Events.Created, model)))
+        Router.ref      ! Publish((clusterId, Recalculate))
     }
 
     def subscribeByClusterId(clusterId: Long, client: ActorRef): Unit = {

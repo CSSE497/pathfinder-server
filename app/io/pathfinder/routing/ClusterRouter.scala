@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import io.pathfinder.models.{Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
+import io.pathfinder.routing.ClusterRouter.Recalculate
 import io.pathfinder.websockets.WebSocketMessage.Routed
 import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Publish
@@ -16,6 +17,7 @@ import scala.collection.mutable
 
 object ClusterRouter {
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster))
+    case object Recalculate
 }
 
 class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus with LookupClassification {
@@ -29,7 +31,7 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
     }
 
     override def subscribe(client: ActorRef, c: Classifier): Boolean = {
-        Logger.info("Websokcet: "+ client+" subscribed to route updates for: "+c)
+        Logger.info("Websocket: "+ client+" subscribed to route updates for: "+c)
         super.subscribe(client, c)
     }
 
@@ -48,7 +50,8 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
     override protected def mapSize(): Int = 16
 
     override def receive: Receive = {
-        case tup: (Long,Publish) => recalculate() // calling refresh will update the cluster model instance
+        case e: Either[_,_] => e.fold(self ! _, self ! _)
+        case Recalculate => recalculate() // calling refresh will update the cluster model instance
         case _Else => super.receive(_Else)
     }
 
