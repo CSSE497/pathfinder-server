@@ -15,10 +15,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import play.api.libs.json.JsValue;
 import play.api.libs.json.Json;
-import scala.collection.JavaConversions;
-
-import java.util.Arrays;
-
 
 /**
  * This test was based off of the documentation at

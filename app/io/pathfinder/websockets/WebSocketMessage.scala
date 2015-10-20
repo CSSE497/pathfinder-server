@@ -120,8 +120,8 @@ object WebSocketMessage {
 
   case class Clusters(
     id: String,
-    defaultCluster: Long,
-    clusters: Seq[Long]
+    defaultClusterId: Long,
+    clusterIds: Seq[Long]
   ) extends WebSocketMessage
   implicit  val clustersFormat = Json.format[Clusters]
   /**
