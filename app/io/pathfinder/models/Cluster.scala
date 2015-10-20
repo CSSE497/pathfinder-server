@@ -1,7 +1,7 @@
 package io.pathfinder.models
 
 import java.util
-import javax.persistence.{OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
+import javax.persistence.{JoinColumn, ManyToOne, OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
 
 import com.avaje.ebean.Model
 import io.pathfinder.data.{Resource, EbeanCrudDao}
@@ -81,6 +81,10 @@ class Cluster() extends Model {
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var commodityList: util.List[Commodity] = new util.ArrayList[Commodity]()
+
+    @ManyToOne
+    @JoinColumn
+    var pathFinderApplication: PathFinderApplication = null
 
     def vehicles: mutable.Buffer[Vehicle] = vehicleList.asScala
     def commodities: mutable.Buffer[Commodity] = commodityList.asScala

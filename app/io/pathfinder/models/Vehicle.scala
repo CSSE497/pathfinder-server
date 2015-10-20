@@ -3,7 +3,7 @@ package io.pathfinder.models
 
 import com.avaje.ebean.Model
 import io.pathfinder.websockets.WebSocketDao
-import javax.persistence.{ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
+import javax.persistence.{JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
 import play.api.libs.json.{Format,Json}
 import io.pathfinder.data.{ClusterQueries, Resource}
 
@@ -88,6 +88,6 @@ class Vehicle() extends Model {
     var capacity: Int = 0
 
     @ManyToOne
-    @Column
+    @JoinColumn
     var cluster: Cluster = null
 }
