@@ -1,7 +1,7 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.{Vehicle, Commodity}
+import io.pathfinder.models.{PathFinderApplication, Vehicle, Commodity}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.controllers.VehicleSocketController._
@@ -64,6 +64,9 @@ class WebSocketActor (
                     ) getOrElse Error("Could not parse json in " + ModelTypes.Vehicle + " Create Request")
                 )
                 case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
+                case GetClusters(id) => client ! Option(PathFinderApplication.finder.byId(id)).map {
+                    app => Clusters(id, app.defaultCluster.id, app.clusters.map(_.id))
+                }.getOrElse(Error("No Application with id: "+id))
                 case Subscribe(cluster, model, event, id) => {
                     client ! Error("Not Implemented")
                 }

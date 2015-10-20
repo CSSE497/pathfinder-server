@@ -1,5 +1,6 @@
 package io.pathfinder.websockets
 
+import io.pathfinder.models.Cluster
 import play.api.libs.json._
 import play.api.mvc.WebSocket.FrameFormatter
 
@@ -110,6 +111,20 @@ object WebSocketMessage {
   implicit val readFormat = Json.format[Read]
 
   /**
+   * Sent by the client that wants to get the clusters for an application
+   */
+  case class GetClusters(
+    id: String
+  ) extends WebSocketMessage
+  implicit val getClustersFormat = Json.format[GetClusters]
+
+  case class Clusters(
+    id: String,
+    defaultCluster: Long,
+    clusters: Seq[Long]
+  ) extends WebSocketMessage
+  implicit  val clustersFormat = Json.format[Clusters]
+  /**
    * Message sent to the client that requested a read
    */
   case class Created(
@@ -186,6 +201,8 @@ object WebSocketMessage {
     (JsPath \ "unsubscribed").read[UnSubscribed].map(identity[WebSocketMessage]) orElse
     (JsPath \ "route").read[Route].map(identity[WebSocketMessage]) orElse
     (JsPath \ "routed").read[Routed].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "getClusters").read[GetClusters].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "clusters").read[Clusters].map(identity[WebSocketMessage])
     errorFormat.map(identity[WebSocketMessage]) orElse unknownMessageFormat.map(identity[WebSocketMessage])
 
   /**
@@ -208,6 +225,8 @@ object WebSocketMessage {
       case u: UnSubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
       case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
       case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
+      case c: GetClusters  => (JsPath \ "getClusters").write(getClustersFormat).writes(c)
+      case c: Clusters     => (JsPath \ "clusters").write(clustersFormat).writes(c)
       case e: Error        => errorFormat.writes(e)
       case u: UnknownMessage => unknownMessageFormat.writes(u)
     }
