@@ -82,10 +82,6 @@ class Cluster() extends Model {
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var commodityList: util.List[Commodity] = new util.ArrayList[Commodity]()
 
-    @ManyToOne
-    @JoinColumn
-    var pathFinderApplication: PathFinderApplication = null
-
     def vehicles: mutable.Buffer[Vehicle] = vehicleList.asScala
     def commodities: mutable.Buffer[Commodity] = commodityList.asScala
 

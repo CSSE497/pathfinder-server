@@ -9,6 +9,7 @@ import io.pathfinder.BaseAppTest;
 import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Commodity;
 import io.pathfinder.models.Vehicle;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,7 +33,7 @@ public class WebSocketActorTest extends BaseAppTest {
     private static final JsValue JSON_CREATE_COMMODITY =
         Json.parse("{\"create\":{\"model\":\"Commodity\",\"value\":{\"startLatitude\":0.1,\"startLongitude\":-12.3,\"endLatitude\":99.4,\"endLongitude\":-3.5,\"clusterId\":1,\"param\":5}}}");
     private static final JsValue JSON_GET_CLUSTERS =
-        Json.parse("{\"getClusters\":{\"id\":\"ABCDEFG\"}");
+        Json.parse("{\"getApplicationCluster\":{\"id\":\""+APPLICATION_ID+"\"}}");
 
     private static final int TIMEOUT = 3000;
 
@@ -86,6 +87,6 @@ public class WebSocketActorTest extends BaseAppTest {
     @Test
     public void testGetClusters() {
         Patterns.ask(socket, WebSocketMessage.format().reads(JSON_GET_CLUSTERS).get(), TIMEOUT);
-        client.expectMsg(new WebSocketMessage.GetClusters("ABCDEFG"));
+        client.expectMsg(new WebSocketMessage.ApplicationCluster(APPLICATION_ID,1L));
     }
 }

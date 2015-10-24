@@ -64,8 +64,8 @@ class WebSocketActor (
                     ) getOrElse Error("Could not parse json in " + ModelTypes.Vehicle + " Create Request")
                 )
                 case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
-                case GetClusters(id) => client ! Option(PathFinderApplication.finder.byId(id)).map {
-                    app => Clusters(id, app.defaultCluster.id, app.clusters.map(_.id))
+                case GetApplicationCluster(id) => client ! Option(PathFinderApplication.finder.byId(id)).map {
+                    app => ApplicationCluster(id, app.cluster.id)
                 }.getOrElse(Error("No Application with id: "+id))
                 case Subscribe(cluster, model, event, id) => {
                     client ! Error("Not Implemented")

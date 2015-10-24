@@ -1,5 +1,7 @@
 package io.pathfinder.websockets
 
+import java.util.UUID
+
 import io.pathfinder.models.Cluster
 import play.api.libs.json._
 import play.api.mvc.WebSocket.FrameFormatter
@@ -113,17 +115,20 @@ object WebSocketMessage {
   /**
    * Sent by the client that wants to get the clusters for an application
    */
-  case class GetClusters(
-    id: String
+  case class GetApplicationCluster(
+    id: UUID
   ) extends WebSocketMessage
-  implicit val getClustersFormat = Json.format[GetClusters]
+  implicit val getApplicationClusterFormat = Json.format[GetApplicationCluster]
+  implicit val uuidFormat = Format[UUID](
+      Reads.StringReads.map(UUID.fromString),
+      Writes(id => Writes.StringWrites.writes(id.toString))
+  )
 
-  case class Clusters(
-    id: String,
-    defaultClusterId: Long,
-    clusterIds: Seq[Long]
+  case class ApplicationCluster(
+    id: UUID,
+    clusterId: Long
   ) extends WebSocketMessage
-  implicit  val clustersFormat = Json.format[Clusters]
+  implicit  val applicationClusterFormat = Json.format[ApplicationCluster]
   /**
    * Message sent to the client that requested a read
    */
@@ -201,8 +206,8 @@ object WebSocketMessage {
     (JsPath \ "unsubscribed").read[UnSubscribed].map(identity[WebSocketMessage]) orElse
     (JsPath \ "route").read[Route].map(identity[WebSocketMessage]) orElse
     (JsPath \ "routed").read[Routed].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "getClusters").read[GetClusters].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "clusters").read[Clusters].map(identity[WebSocketMessage])
+    (JsPath \ "getApplicationCluster").read[GetApplicationCluster].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "applicationCluster").read[ApplicationCluster].map(identity[WebSocketMessage])
     errorFormat.map(identity[WebSocketMessage]) orElse unknownMessageFormat.map(identity[WebSocketMessage])
 
   /**
@@ -225,8 +230,8 @@ object WebSocketMessage {
       case u: UnSubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
       case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
       case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
-      case c: GetClusters  => (JsPath \ "getClusters").write(getClustersFormat).writes(c)
-      case c: Clusters     => (JsPath \ "clusters").write(clustersFormat).writes(c)
+      case c: GetApplicationCluster => (JsPath \ "getApplicationCluster").write(getApplicationClusterFormat).writes(c)
+      case c: ApplicationCluster    => (JsPath \ "applicationCluster").write(applicationClusterFormat).writes(c)
       case e: Error        => errorFormat.writes(e)
       case u: UnknownMessage => unknownMessageFormat.writes(u)
     }

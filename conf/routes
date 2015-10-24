@@ -20,4 +20,4 @@ GET           /cluster/:id          io.pathfinder.controllers.ClusterController.
 POST          /cluster              io.pathfinder.controllers.ClusterController.createCluster()
 DELETE        /cluster/:id          io.pathfinder.controllers.ClusterController.deleteCluster(id: Long)
 
-GET           /application/:id      io.pathfinder.controllers.PathFinderApplicationController.get(id: String)
+GET           /application/:id      io.pathfinder.controllers.PathFinderApplicationController.get(id: java.util.UUID)
