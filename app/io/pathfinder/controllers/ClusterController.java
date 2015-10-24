@@ -1,23 +1,16 @@
 package io.pathfinder.controllers;
 
-import com.avaje.ebean.Ebean;
-import com.avaje.ebean.text.json.JsonContext;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.pathfinder.models.Cluster;
 import play.Logger;
 import play.api.libs.json.JsValue;
-import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Result;
-import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import javax.persistence.PersistenceException;
 
 public class ClusterController extends Controller {
-    private JsonContext jsonContext = Ebean.createJsonContext();
 
     public Result getClusters() {
         List<String> jsObjs = Cluster.finder().all().stream().map(x -> Cluster.format().writes(x).toString()).collect(Collectors.toList());

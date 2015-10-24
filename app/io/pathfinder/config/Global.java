@@ -1,5 +1,7 @@
 package io.pathfinder.config;
 
+import io.pathfinder.models.Cluster;
+import io.pathfinder.models.PathFinderApplication;
 import io.pathfinder.routing.Router;
 import play.Application;
 import play.GlobalSettings;
