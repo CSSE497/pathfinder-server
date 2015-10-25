@@ -1,6 +1,6 @@
 package io.pathfinder.routing
 
-import io.pathfinder.models.Commodity
+import io.pathfinder.models.{Vehicle, Commodity}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
 import org.scalatestplus.play.PlaySpec
 import play.api.libs.json.Json
@@ -48,7 +48,9 @@ class RouteTest extends PlaySpec {
         (b,c) => b += new PickUp(c) += new DropOff(c)
     }.result()
 
-    val route = Route(9,actions)
+    val vehicle = Vehicle(9, 2, 3, 1)
+
+    val route = Route(vehicle,actions)
 
     "Route.writes" should {
         "write a route object into json" in {

@@ -94,4 +94,8 @@ class Vehicle() extends Model with HasId with HasCluster {
     @ManyToOne
     @Column
     var cluster: Cluster = null
+
+    override def toString = {
+        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + capacity + ")"
+    }
 }
