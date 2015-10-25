@@ -215,9 +215,9 @@ object WebSocketMessage {
     (JsPath \ "update").read[Update].map(identity[WebSocketMessage]) orElse
     (JsPath \ "delete").read[Delete].map(identity[WebSocketMessage]) orElse
     (JsPath \ "subscribe").read[Subscribe].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "routesubscribe").read[RouteSubscribe].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "routesubscribed").read[RouteSubscribed].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "routeunsubscribe").read[RouteUnsubscribe].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routeSubscribe").read[RouteSubscribe].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routeSubscribed").read[RouteSubscribed].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routeUnsubscribe").read[RouteUnsubscribe].map(identity[WebSocketMessage]) orElse
     (JsPath \ "unsubscribe").read[Unsubscribe].map(identity[WebSocketMessage]) orElse
     (JsPath \ "created").read[Created].map(identity[WebSocketMessage]) orElse
     (JsPath \ "model").read[Model].map(identity[WebSocketMessage]) orElse
@@ -249,9 +249,9 @@ object WebSocketMessage {
       case d: Deleted      => (JsPath \ "deleted").write(deletedFormat).writes(d)
       case s: Subscribed   => (JsPath \ "subscribed").write(subscribedFormat).writes(s)
       case u: Unsubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
-      case s: RouteSubscribe   => (JsPath \ "routesubscribe").write(routeSubscribeFormat).writes(s)
-      case u: RouteUnsubscribe => (JsPath \ "routeunsubscribe").write(routeUnsubscribeFormat).writes(u)
-      case s: RouteSubscribed  => (JsPath \ "routesubscribed").write(routeSubscribedFormat).writes(s)
+      case s: RouteSubscribe   => (JsPath \ "routeUnbscribe").write(routeSubscribeFormat).writes(s)
+      case u: RouteUnsubscribe => (JsPath \ "routeUnsubscribe").write(routeUnsubscribeFormat).writes(u)
+      case s: RouteSubscribed  => (JsPath \ "routeSubscribed").write(routeSubscribedFormat).writes(s)
       case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
       case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
       case c: GetApplicationCluster => (JsPath \ "getApplicationCluster").write(getApplicationClusterFormat).writes(c)
