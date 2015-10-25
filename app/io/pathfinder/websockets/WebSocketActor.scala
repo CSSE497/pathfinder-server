@@ -1,7 +1,7 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.{PathfinderApplication$, Vehicle, Commodity}
+import io.pathfinder.models.{PathfinderApplication, Vehicle, Commodity}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._

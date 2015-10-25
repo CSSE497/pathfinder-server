@@ -14,15 +14,16 @@ object PathfinderApplication {
 
     val format: Format[PathfinderApplication] = Json.format[PathfinderApplication]
 
-    def apply(id: UUID, name: String, defaultClusterId: Long): PathfinderApplication = {
+    def apply(id: UUID, name: String, token: String, defaultClusterId: Long): PathfinderApplication = {
         val app = new PathfinderApplication
         app.id = id
+        app.token = token
         app.cluster = Cluster.Dao.read(defaultClusterId).get
         app
     }
 
-    def unapply(p: PathfinderApplication): Option[(UUID, String, Long)] =
-        Some((p.id, p.name, Option(p.cluster).map(_.id).getOrElse(0L)))
+    def unapply(p: PathfinderApplication): Option[(UUID, String, String, Long)] =
+        Some((p.id, p.name, p.token, Option(p.cluster).map(_.id).getOrElse(0L)))
 }
 
 @Entity
@@ -34,6 +35,9 @@ class PathfinderApplication extends Model {
 
     @Column
     var name: String = null
+
+    @Column
+    var token: String = null
 
     @ManyToOne
     @JoinColumn
