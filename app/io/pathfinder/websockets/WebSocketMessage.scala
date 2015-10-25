@@ -1,6 +1,6 @@
 package io.pathfinder.websockets
 
-import io.pathfinder.models.{Commodity, Vehicle}
+import java.util.UUID
 import play.api.libs.json._
 import play.api.mvc.WebSocket.FrameFormatter
 
@@ -133,6 +133,23 @@ object WebSocketMessage {
   implicit val readFormat = Json.format[Read]
 
   /**
+   * Sent by the client that wants to get the clusters for an application
+   */
+  case class GetApplicationCluster(
+    id: UUID
+  ) extends WebSocketMessage
+  implicit val getApplicationClusterFormat = Json.format[GetApplicationCluster]
+  implicit val uuidFormat = Format[UUID](
+      Reads.StringReads.map(UUID.fromString),
+      Writes(id => Writes.StringWrites.writes(id.toString))
+  )
+
+  case class ApplicationCluster(
+    id: UUID,
+    clusterId: Long
+  ) extends WebSocketMessage
+  implicit  val applicationClusterFormat = Json.format[ApplicationCluster]
+  /**
    * Message sent to the client that requested a read
    */
   case class Created(
@@ -210,6 +227,8 @@ object WebSocketMessage {
     (JsPath \ "unsubscribed").read[Unsubscribed].map(identity[WebSocketMessage]) orElse
     (JsPath \ "route").read[Route].map(identity[WebSocketMessage]) orElse
     (JsPath \ "routed").read[Routed].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "getApplicationCluster").read[GetApplicationCluster].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "applicationCluster").read[ApplicationCluster].map(identity[WebSocketMessage])
     errorFormat.map(identity[WebSocketMessage]) orElse unknownMessageFormat.map(identity[WebSocketMessage])
 
   /**
@@ -235,6 +254,8 @@ object WebSocketMessage {
       case s: RouteSubscribed  => (JsPath \ "routesubscribed").write(routeSubscribedFormat).writes(s)
       case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
       case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
+      case c: GetApplicationCluster => (JsPath \ "getApplicationCluster").write(getApplicationClusterFormat).writes(c)
+      case c: ApplicationCluster    => (JsPath \ "applicationCluster").write(applicationClusterFormat).writes(c)
       case e: Error        => errorFormat.writes(e)
       case u: UnknownMessage => unknownMessageFormat.writes(u)
     }

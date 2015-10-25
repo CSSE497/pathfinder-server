@@ -9,13 +9,13 @@ import io.pathfinder.BaseAppTest;
 import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Commodity;
 import io.pathfinder.models.Vehicle;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import play.api.libs.json.JsValue;
 import play.api.libs.json.Json;
-
 
 /**
  * This test was based off of the documentation at
@@ -32,6 +32,9 @@ public class WebSocketActorTest extends BaseAppTest {
         Json.parse("{\"create\":{\"model\":\"Vehicle\",\"value\":{\"latitude\":0.1,\"longitude\":-12.3,\"clusterId\":1,\"capacity\":99}}}");
     private static final JsValue JSON_CREATE_COMMODITY =
         Json.parse("{\"create\":{\"model\":\"Commodity\",\"value\":{\"startLatitude\":0.1,\"startLongitude\":-12.3,\"endLatitude\":99.4,\"endLongitude\":-3.5,\"clusterId\":1,\"param\":5}}}");
+    private static final JsValue JSON_GET_CLUSTERS =
+        Json.parse("{\"getApplicationCluster\":{\"id\":\""+APPLICATION_ID+"\"}}");
+
     private static final int TIMEOUT = 3000;
 
     @Before
@@ -78,5 +81,11 @@ public class WebSocketActorTest extends BaseAppTest {
         createdCommodity.param_$eq(5);
         client.expectMsg(new WebSocketMessage.Created(
             ModelTypes.Commodity(), Commodity.format().writes(createdCommodity)));
+    }
+
+    @Test
+    public void testGetClusters() {
+        Patterns.ask(socket, WebSocketMessage.format().reads(JSON_GET_CLUSTERS).get(), TIMEOUT);
+        client.expectMsg(new WebSocketMessage.ApplicationCluster(APPLICATION_ID,1L));
     }
 }

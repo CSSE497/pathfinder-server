@@ -1,7 +1,7 @@
 package io.pathfinder.models
 
 import java.util
-import javax.persistence.{OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
+import javax.persistence.{JoinColumn, ManyToOne, OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
 
 import com.avaje.ebean.Model
 import io.pathfinder.data.{ObserverDao, Resource}
