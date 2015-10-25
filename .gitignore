@@ -24,4 +24,3 @@ server.pid
 *.eml
 /dist/
 .cache
-conf/evolutions
