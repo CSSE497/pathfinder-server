@@ -8,25 +8,25 @@ import play.api.libs.json.{Json, Format}
 
 
 
-object PathFinderApplication {
-    val finder: Find[UUID, PathFinderApplication] =
-        new Finder[UUID, PathFinderApplication](classOf[PathFinderApplication])
+object PathfinderApplication {
+    val finder: Find[UUID, PathfinderApplication] =
+        new Finder[UUID, PathfinderApplication](classOf[PathfinderApplication])
 
-    val format: Format[PathFinderApplication] = Json.format[PathFinderApplication]
+    val format: Format[PathfinderApplication] = Json.format[PathfinderApplication]
 
-    def apply(id: UUID, name: String, defaultClusterId: Long): PathFinderApplication = {
-        val app = new PathFinderApplication
+    def apply(id: UUID, name: String, defaultClusterId: Long): PathfinderApplication = {
+        val app = new PathfinderApplication
         app.id = id
         app.cluster = Cluster.Dao.read(defaultClusterId).get
         app
     }
 
-    def unapply(p: PathFinderApplication): Option[(UUID, String, Long)] =
+    def unapply(p: PathfinderApplication): Option[(UUID, String, Long)] =
         Some((p.id, p.name, Option(p.cluster).map(_.id).getOrElse(0L)))
 }
 
 @Entity
-class PathFinderApplication extends Model {
+class PathfinderApplication extends Model {
 
     @Id
     @Column(updatable = false)
