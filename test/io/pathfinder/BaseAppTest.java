@@ -1,11 +1,9 @@
 package io.pathfinder;
 
 import io.pathfinder.models.Cluster;
-import io.pathfinder.models.PathFinderApplication;
+import io.pathfinder.models.PathfinderApplication;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import play.test.FakeApplication;
 import play.test.Helpers;
 
@@ -18,19 +16,19 @@ import java.util.UUID;
 public class BaseAppTest {
     public static FakeApplication app;
     public static final Cluster cluster = new Cluster();
-    public static final PathFinderApplication pathfinderApplication = new PathFinderApplication();
+    public static final PathfinderApplication PATHFINDER_APPLICATION = new PathfinderApplication();
     public static final UUID APPLICATION_ID = UUID.fromString("001e7047-ee14-40d6-898a-5acf3a1cfd8a");
 
     @Before
     public void startApp() {
         app = Helpers.fakeApplication(Helpers.inMemoryDatabase());
         Helpers.start(app);
-        pathfinderApplication.id_$eq(APPLICATION_ID);
-        pathfinderApplication.name_$eq("MY COOL APP");
+        PATHFINDER_APPLICATION.id_$eq(APPLICATION_ID);
+        PATHFINDER_APPLICATION.name_$eq("MY COOL APP");
         cluster.id_$eq(1);
         cluster.insert();
-        pathfinderApplication.cluster_$eq(cluster);
-        pathfinderApplication.insert();
+        PATHFINDER_APPLICATION.cluster_$eq(cluster);
+        PATHFINDER_APPLICATION.insert();
         cluster.save();
     }
 
