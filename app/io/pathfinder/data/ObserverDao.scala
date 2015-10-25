@@ -5,11 +5,8 @@ import com.avaje.ebean.Model.Find
 
 /**
  * subclasses can use callbacks to listen to changes to models in the specified dao
- * @param dao
- * @tparam Long
- * @tparam V
  */
-abstract class ObserverDao[Long,V <: Model](dao: CrudDao[Long,V]) extends CrudDao[Long,V] {
+abstract class ObserverDao[V <: Model](dao: CrudDao[Long,V]) extends CrudDao[Long,V] {
 
   def this(find: Find[Long,V]) = this(new EbeanCrudDao[Long,V](find))
 

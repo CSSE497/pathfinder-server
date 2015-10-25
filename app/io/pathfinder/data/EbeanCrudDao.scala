@@ -13,7 +13,7 @@ class EbeanCrudDao[K,M <: Model](protected val finder: Model.Find[K,M]) extends 
     }
 
     final def create(create: Resource[M]): Option[M] = {
-        create.create().map {
+        create.create.map {
             (model: M) =>
                 Logger.info(String.format("EbeanCrudDao inserting new %s: %s", model.getClass.getName, model))
                 model.insert()

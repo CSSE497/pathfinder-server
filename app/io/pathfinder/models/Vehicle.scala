@@ -1,11 +1,12 @@
 package io.pathfinder.models
 
-
 import com.avaje.ebean.Model
-import io.pathfinder.websockets.WebSocketDao
+import io.pathfinder.data.{ClusterQueries, Resource}
+import io.pathfinder.websockets.ModelTypes
+import io.pathfinder.websockets.pushing.WebSocketDao
 import javax.persistence.{JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
 import play.api.libs.json.{Format,Json}
-import io.pathfinder.data.{ClusterQueries, Resource}
+import play.api.libs.json.{Writes, Format, Json}
 
 object Vehicle {
 
@@ -16,6 +17,10 @@ object Vehicle {
             c.refresh()
             c.vehicles
         }
+
+        override def modelType: ModelTypes.Value = ModelTypes.Vehicle
+
+        override def writer: Writes[Vehicle] = Vehicle.format
     }
 
     implicit val format: Format[Vehicle] = Json.format[Vehicle]
@@ -71,7 +76,7 @@ object Vehicle {
 }
 
 @Entity
-class Vehicle() extends Model {
+class Vehicle() extends Model with HasId with HasCluster {
 
     @Id
     @Column(nullable = false)
@@ -90,4 +95,8 @@ class Vehicle() extends Model {
     @ManyToOne
     @JoinColumn
     var cluster: Cluster = null
+
+    override def toString = {
+        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + capacity + ")"
+    }
 }

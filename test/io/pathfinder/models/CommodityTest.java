@@ -229,7 +229,7 @@ public class CommodityTest extends BaseAppTest {
                 .bodyJson(body);
         Result result = Helpers.route(request);
 
-        assertEquals("Successful Put should return no content code", 204, result.status());
+        assertEquals("Successful Put should return no content code", 200, result.status());
 
         Commodity commodity = Commodity.finder().byId(1L);
         assertEquals("Commodity PUT changes should persist in the db", 500.0, commodity.startLatitude(), .001);

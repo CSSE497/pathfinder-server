@@ -64,9 +64,8 @@ public class WebSocketActorTest extends BaseAppTest {
         createdVehicle.latitude_$eq(0.1);
         createdVehicle.longitude_$eq(-12.3);
         createdVehicle.capacity_$eq(99);
-        client.expectMsgClass(WebSocketMessage.Routed.class);
         client.expectMsg(new WebSocketMessage.Created(
-            ModelTypes.Vehicle(), Vehicle.format().writes(createdVehicle)));
+                ModelTypes.Vehicle(), Vehicle.format().writes(createdVehicle)));
     }
 
     @Test

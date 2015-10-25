@@ -1,108 +1,85 @@
 package io.pathfinder.routing
 
-import akka.actor.ActorRef
+import akka.actor.{Props, ActorRef}
+import akka.event.{LookupClassification, ActorEventBus}
+import akka.pattern.ask
+import akka.util.Timeout
+import io.pathfinder.config.Global
 import io.pathfinder.models.{Cluster, Commodity, Vehicle}
-import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
+import io.pathfinder.routing.ClusterRouter.Recalculate
+import io.pathfinder.websockets.pushing.EventBusActor
+import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage
+import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{Subscribe, Publish}
 import io.pathfinder.websockets.{ModelTypes, Events}
-import io.pathfinder.websockets.WebSocketMessage.Routed
-import play.Logger
-import play.api.libs.iteratee.{Iteratee, Enumerator}
-import scala.Predef
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.collection.mutable.{Set,Builder}
-import scala.collection.mutable
-import Function.tupled
 
 object Router {
+
     // This can be used to force the initialization of the static code in this class from Java.
     def init(): Unit = {}
 
-    Logger.info("Now initializing Router singleton")
+    // all other codes should use this value to communicate with the router actor
+    val ref: ActorRef = Global.actorSystem.actorOf(Props(classOf[Router]))
+    implicit val timeout = Timeout(2.seconds) // used for the recalculation futures used right below
 
-    // these should probably be thread safe eventually
-    private val vehicles: mutable.Map[Vehicle,Set[ActorRef]] = mutable.Map[Vehicle,Set[ActorRef]]()
-    private val commodities = mutable.Set[Commodity]()
-
-    def addVehicle(v: Vehicle): Unit = {
-        Logger.info("Adding Vehicle To routed collection: "+v)
-        if (!vehicles.contains(v)) {
-            vehicles.put(v, Set[ActorRef]())
-        }
-        recalculate()
-    }
-
-    def addVehicle(v: Vehicle, actor: ActorRef): Unit = {
-        Logger.info("Adding Vehicle To routed collection: "+v)
-        if (!vehicles.contains(v)) {
-            vehicles.put(v, Set[ActorRef]())
-        }
-        vehicleSubscribe(v, actor)
-        recalculate()
-    }
-
-    def addCommodity(c: Commodity): Unit = {
-        Logger.info("Adding Commodity To routed collection: "+c)
-        commodities += c
-        recalculate()
-    }
-
-    // Dan wrote an infinite loop here.
-    private def recalculate(): Unit = {
-        if (vehicles.size <= 0) {
-            Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
-            return
-        }
-        Logger.info("Reticulating splines")
-        val builders: Seq[mutable.Builder[Action, Seq[Action]]] = Seq.fill(vehicles.size) { Seq.newBuilder[Action]}
-        var i = 0
-        commodities.foreach {
-            c => {
-                Logger.info(String.format("Adding %s to a route", c))
-                builders(i % vehicles.size) += new PickUp(c) += new DropOff(c)
-                i += 1
+    // TODO: actually check that subscriptions are made correctly, may require rewriting code to use Futures
+    object RouteSubscriber {
+        def subscribe(client: ActorRef, model: ModelTypes.Value, id: Long): Boolean = {
+            val cluster = model match {
+                case ModelTypes.Vehicle =>
+                    Vehicle.Dao.read(id).getOrElse(return false).cluster
+                case ModelTypes.Commodity =>
+                    Commodity.Dao.read(id).getOrElse(return false).cluster
+                case ModelTypes.Cluster =>
+                    (ref ? Publish(id, Subscribe(client, (ModelTypes.Cluster, id)))).onComplete{
+                        x => ref ! Publish((id, Recalculate)) // recalculate to send pushes to newly registered (as well as old)
+                                               // websockets, this really should be replaced with something less silly
+                    }
+                    return true
             }
-        }
-        val routes: Seq[(Vehicle, Route)] = builders.zip(vehicles.keySet) map tupled { (builder, v) => (v, new Route(v.id, Seq(new Start(v)) ++ builder.result())) }
-        routes.foreach {
-            case (v,route) => {
-                Logger.info(String.format("Notififying observers of new route for %s", v))
-                vehicles.get(v).get.foreach{actor => actor ! Routed(ModelTypes.Vehicle, v.id, Route.writes.writes(route))}
-            }
-        }
-        Logger.info("Finished recalculating routes")
-    }
-
-    val initThread = new Thread {
-        // Dan also wrote an infinite loop here but we couldn't fix it so we put it in it's own thread.
-        // Yes, it's still an infinite loop that happens on the first thread of the server.
-        val vehicleEnum: Enumerator[(Events.Value, Vehicle)] = Vehicle.Dao.clusterSubscribe()
-        val commodityEnum: Enumerator[(Events.Value, Commodity)] = Commodity.Dao.clusterSubscribe()
-
-        vehicleEnum.run(Iteratee.foreach {
-            case (event, v) => {
-                Logger.info("Router received vehicle: " + v + " with event " + event)
-                event match {
-                    case (Events.Created) => Unit; //addVehicle(v)
-                    case _ => Logger.error("Router cannot handle this event: "+event+" for model "+v)
-                }
-            }
-        })
-
-        commodityEnum.run(Iteratee.foreach {
-            case (Events.Created, c) => Unit; //addCommodity(c)
-            case (e, c) => Logger.error("Router cannot handle this event: "+e+" for model "+c)
-        })
-    }
-    initThread.start
-
-    /** If the vehicle has not yet been added, it will not be added. */
-    def vehicleSubscribe(v: Vehicle, socket: ActorRef) {
-        val observers: Option[mutable.Set[ActorRef]] = vehicles.get(v)
-        if (observers.isDefined) {
-            vehicles.put(v, vehicles.get(v).get + socket)
-            Logger.info(String.format("%s now subscribed to %s", socket, v))
-        } else {
-            Logger.info(String.format("Failed to add subscriber for %s", v))
+            (ref ? Publish(cluster.id, Subscribe(client, (model, id)))).onComplete{x => ref ! Publish((cluster.id, Recalculate))} // read above
+            true
         }
     }
+}
+
+/**
+ * The Router is an actor that is responsible for dispatching subscription requests and route updates to cluster routers.
+ */
+class Router extends EventBusActor with ActorEventBus with LookupClassification {
+
+    if(Router.ref != self){
+        throw new Error("Router Actor must be a singleton")
+    }
+
+    // populate the cluster routers
+    Cluster.Dao.readAll.foreach{
+        cluster =>
+            subscribe(
+                Global.actorSystem.actorOf(ClusterRouter.props(cluster)),
+                cluster.id
+            )
+    }
+
+    override def receive: Receive = {
+        case (Events.Created, cluster: Cluster) =>
+            subscribe(Global.actorSystem.actorOf(ClusterRouter.props(cluster)), cluster.id)
+        case (Events.Deleted, cluster: Cluster) =>
+            subscribers.remove(cluster.id).foreach(
+                _.foreach(Global.actorSystem.stop)
+            )
+        case Publish((id: Long, Recalculate)) => publish((id,Right(Recalculate)))
+        case Publish((id: Long, msg: EventBusMessage)) => publish((id,Left(msg)))
+        case _Else => super.receive(_Else)
+    }
+
+    override type Classifier = Long // cluster id
+    override type Event = (Long, Either[EventBusMessage,Recalculate.type]) // cluster id and cluster router message
+
+    override protected def classify(event: Event): Classifier = event._1
+
+    override protected def mapSize(): Int = 16
+
+    override protected def publish(event: Event, subscriber: ActorRef): Unit = subscriber ! event._2
 }

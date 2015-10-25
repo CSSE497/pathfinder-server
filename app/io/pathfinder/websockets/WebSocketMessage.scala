@@ -1,8 +1,6 @@
 package io.pathfinder.websockets
 
 import java.util.UUID
-
-import io.pathfinder.models.Cluster
 import play.api.libs.json._
 import play.api.mvc.WebSocket.FrameFormatter
 
@@ -37,24 +35,46 @@ object WebSocketMessage {
   /**
    * Sent by the client to unsubscribe from push notifications
    */
-  case class UnSubscribe(
-    cluster: Option[Long],
-    model:   Option[ModelType],
-    event:   Option[Events.Value],
-    id:      Option[Long]
+  case class Unsubscribe(
+    clusterId: Option[Long],
+    model:     Option[ModelType],
+    id:        Option[Long]
   ) extends WebSocketMessage
-  implicit val unSubscribeFormat = Json.format[UnSubscribe]
+  implicit val unSubscribeFormat = Json.format[Unsubscribe]
 
   /**
    * Sent by the client to subscribe to push notifications
    */
   case class Subscribe(
-    cluster: Long,
-    model:   Option[ModelType],
-    event:   Option[Event],
-    id:      Option[Long]
+    clusterId: Option[Long],
+    model:     ModelType,
+    id:        Option[Long]
   ) extends WebSocketMessage
   implicit val subscribeFormat = Json.format[Subscribe]
+
+  /**
+   * Sent by the client to subscribe to route updates
+   */
+  case class RouteSubscribe(
+    model:     ModelType,
+    id:        Long
+  ) extends WebSocketMessage
+  implicit val routeSubscribeFormat = Json.format[RouteSubscribe]
+
+  /**
+   * Sent by the client to unsubscribe from route updates
+   */
+  case class RouteUnsubscribe(
+    model:     ModelType,
+    id:        Long
+  ) extends WebSocketMessage
+  implicit val routeUnsubscribeFormat = Json.format[RouteUnsubscribe]
+
+  case class RouteSubscribed(
+    model:     ModelType,
+    id:        Long
+  ) extends WebSocketMessage
+  implicit val routeSubscribedFormat = Json.format[RouteSubscribed]
 
   /**
    * Sent by the client to create a new model
@@ -98,8 +118,8 @@ object WebSocketMessage {
    */
   case class Routed(
     model: ModelType,
-    id:    Long,
-    value: JsValue
+    value: JsValue,
+    route: JsValue
   ) extends ControllerMessage
   implicit val routedFormat = Json.format[Routed]
 
@@ -170,23 +190,21 @@ object WebSocketMessage {
    * Message sent to a client that requested a subscribe
    */
   case class Subscribed(
-    cluster: Long,
-    model:   Option[ModelType],
-    event:   Option[Events.Value],
-    id:      Option[Long]
+    clusterId: Option[Long],
+    model:     ModelType,
+    id:        Option[Long]
   ) extends WebSocketMessage
   implicit val subscribedFormat = Json.format[Subscribed]
 
   /**
    * Message sent to a client that requested to unsubscribe
    */
-  case class UnSubscribed(
-    cluster: Long,
+  case class Unsubscribed(
+    cluster: Option[Long],
     model:   Option[ModelType],
-    event:   Option[Events.Value],
     id:      Option[Long]
   ) extends WebSocketMessage
-  implicit val unSubscribedFormat = Json.format[UnSubscribed]
+  implicit val unSubscribedFormat = Json.format[Unsubscribed]
 
   /**
    * Converts json into WebSocketMessages
@@ -197,13 +215,16 @@ object WebSocketMessage {
     (JsPath \ "update").read[Update].map(identity[WebSocketMessage]) orElse
     (JsPath \ "delete").read[Delete].map(identity[WebSocketMessage]) orElse
     (JsPath \ "subscribe").read[Subscribe].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "unsubscribe").read[UnSubscribe].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routesubscribe").read[RouteSubscribe].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routesubscribed").read[RouteSubscribed].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "routeunsubscribe").read[RouteUnsubscribe].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "unsubscribe").read[Unsubscribe].map(identity[WebSocketMessage]) orElse
     (JsPath \ "created").read[Created].map(identity[WebSocketMessage]) orElse
     (JsPath \ "model").read[Model].map(identity[WebSocketMessage]) orElse
     (JsPath \ "updated").read[Updated].map(identity[WebSocketMessage]) orElse
     (JsPath \ "deleted").read[Deleted].map(identity[WebSocketMessage]) orElse
     (JsPath \ "subscribed").read[Subscribed].map(identity[WebSocketMessage]) orElse
-    (JsPath \ "unsubscribed").read[UnSubscribed].map(identity[WebSocketMessage]) orElse
+    (JsPath \ "unsubscribed").read[Unsubscribed].map(identity[WebSocketMessage]) orElse
     (JsPath \ "route").read[Route].map(identity[WebSocketMessage]) orElse
     (JsPath \ "routed").read[Routed].map(identity[WebSocketMessage]) orElse
     (JsPath \ "getApplicationCluster").read[GetApplicationCluster].map(identity[WebSocketMessage]) orElse
@@ -221,13 +242,16 @@ object WebSocketMessage {
       case u: Update       => (JsPath \ "update").write(updateFormat).writes(u)
       case d: Delete       => (JsPath \ "delete").write(deleteFormat).writes(d)
       case s: Subscribe    => (JsPath \ "subscribe").write(subscribeFormat).writes(s)
-      case u: UnSubscribe  => (JsPath \ "unsubscribe").write(unSubscribeFormat).writes(u)
+      case u: Unsubscribe  => (JsPath \ "unsubscribe").write(unSubscribeFormat).writes(u)
       case c: Created      => (JsPath \ "created").write(createdFormat).writes(c)
       case m: Model        => (JsPath \ "model").write(modelFormat).writes(m)
       case u: Updated      => (JsPath \ "updated").write(updatedFormat).writes(u)
       case d: Deleted      => (JsPath \ "deleted").write(deletedFormat).writes(d)
       case s: Subscribed   => (JsPath \ "subscribed").write(subscribedFormat).writes(s)
-      case u: UnSubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
+      case u: Unsubscribed => (JsPath \ "unsubscribed").write(unSubscribedFormat).writes(u)
+      case s: RouteSubscribe   => (JsPath \ "routesubscribe").write(routeSubscribeFormat).writes(s)
+      case u: RouteUnsubscribe => (JsPath \ "routeunsubscribe").write(routeUnsubscribeFormat).writes(u)
+      case s: RouteSubscribed  => (JsPath \ "routesubscribed").write(routeSubscribedFormat).writes(s)
       case r: Route        => (JsPath \ "route").write(routeFormat).writes(r)
       case r: Routed       => (JsPath \ "routed").write(routedFormat).writes(r)
       case c: GetApplicationCluster => (JsPath \ "getApplicationCluster").write(getApplicationClusterFormat).writes(c)

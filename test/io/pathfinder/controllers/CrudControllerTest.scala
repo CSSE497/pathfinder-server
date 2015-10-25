@@ -1,5 +1,6 @@
 package io.pathfinder.controllers
 
+import io.pathfinder.websockets.ModelTypes
 import org.scalatest.mock.MockitoSugar
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
@@ -32,7 +33,9 @@ object CrudControllerTest extends MockitoSugar {
     }
 
     val mockDao = mock[CrudDao[Long,TestModel]]
-    object TestController extends CrudController(mockDao)
+    object TestController extends CrudController[Long,TestModel](mockDao) {
+        override val model = ModelTypes.Commodity
+    }
 }
 
 class CrudControllerTest extends ControllerTest with MockitoSugar {

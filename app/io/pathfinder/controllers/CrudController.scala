@@ -1,5 +1,6 @@
 package io.pathfinder.controllers
 
+import io.pathfinder.websockets.ModelTypes.ModelType
 import play.api.mvc.{Controller,Action}
 import play.api.libs.json.{Json,Reads,Writes}
 import io.pathfinder.data.{CrudDao,Resource}
@@ -10,6 +11,8 @@ import io.pathfinder.data.{CrudDao,Resource}
 abstract class CrudController[K,V](dao: CrudDao[K,V])
         (implicit val reads: Reads[V], implicit val writes: Writes[V], implicit val resources: Reads[_ <: Resource[V]]) extends Controller {
 
+    def model: ModelType
+
     /**
      * returns all of this controller's models
      */
@@ -18,7 +21,7 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
     def get(id: K) = Action {
         dao.read(id).map {
             model => Ok(Json.toJson(model))
-        } getOrElse NotFound
+        } getOrElse NotFound("No "+ model+" with id "+id.toString+" in database")
     }
 
     /**
@@ -31,8 +34,8 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
             create =>
                 dao.create(create).map {
                     model => Created(Json.toJson(model))
-                } getOrElse BadRequest
-        } getOrElse BadRequest
+                } getOrElse BadRequest("Error creating "+model+" from resource: "+resources)
+        } getOrElse BadRequest("Error reading "+model+": "+request.body)
     }
 
     /**
@@ -46,8 +49,8 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
                 dao.update(id,update).map{
                     model =>
                         Ok(Json.toJson(model))
-                } getOrElse NotFound
-        } getOrElse BadRequest
+                } getOrElse NotFound("No "+model+" with id: "+id)
+        } getOrElse BadRequest("Error reading "+model+": "+request.body)
     }
 
     /**
@@ -57,6 +60,6 @@ abstract class CrudController[K,V](dao: CrudDao[K,V])
         dao.delete(id).map{
             model =>
                 Ok(Json.toJson(model))
-        } getOrElse NotFound
+        } getOrElse NotFound("No "+model+" with id: "+id)
     }
 }
