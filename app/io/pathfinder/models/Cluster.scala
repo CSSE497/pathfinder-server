@@ -89,7 +89,7 @@ class Cluster() extends Model with HasId {
     var id: Long = 0
 
     @Column
-    var authenticationToken: String = "top secret"
+    var authenticationToken: Array[Byte] = "top secret".getBytes
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
