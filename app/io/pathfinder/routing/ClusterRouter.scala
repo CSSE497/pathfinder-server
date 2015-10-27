@@ -1,6 +1,6 @@
 package io.pathfinder.routing
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{PoisonPill, ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import io.pathfinder.models.{Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
@@ -16,11 +16,11 @@ import scala.Function._
 import scala.collection.mutable
 
 object ClusterRouter {
-    def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster))
+    def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
     case object Recalculate
 }
 
-class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus with LookupClassification {
+class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus with LookupClassification {
     override type Event = ((ModelTypes.Value, Long), Routed)
     override type Classifier = (ModelTypes.Value, Long) // subscribe by model and by id
 
@@ -56,7 +56,10 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
     }
 
     private def recalculate(): Unit = {
-        cluster.refresh()
+        val cluster: Cluster = Cluster.Dao.read(clusterId).getOrElse{
+            self ! PoisonPill
+            return
+        }
         val vehicles = cluster.vehicles
         val commodities = cluster.commodities
         if (vehicles.size <= 0) {
@@ -81,6 +84,6 @@ class ClusterRouter(cluster: Cluster) extends EventBusActor with ActorEventBus w
             Writes.seq(Route.writes).writes(routes)
         )
         publish(((ModelTypes.Cluster,cluster.id), clusterRouted)) // send list of routes to cluster subscribers
-        Logger.info("Finished recalculating routes")
+        Logger.info("Finished recalculating routes:\n"+clusterRouted)
     }
 }
