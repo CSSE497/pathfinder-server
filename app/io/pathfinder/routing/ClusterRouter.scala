@@ -57,7 +57,7 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
     private def recalculate(): Unit = {
         val cluster: Cluster = Cluster.Dao.read(clusterId).getOrElse{
-            self ! PoisonPill
+            Logger.warn("Cluster with id: "+clusterId+" missing")
             return
         }
         val vehicles = cluster.vehicles
