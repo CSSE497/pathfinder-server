@@ -1,16 +1,11 @@
 package io.pathfinder.websockets
 
-import play.api.libs.json._
+import io.pathfinder.util.HasFormat
 
 /**
  * An enum containing the models that a websocket message can use
  */
-object ModelTypes extends Enumeration {
+object ModelTypes extends Enumeration with HasFormat {
     type ModelType = Value
     val Vehicle, Commodity, Cluster = Value
-
-    implicit val format: Format[Value] = Format(
-      Reads.JsStringReads.map(json => ModelTypes.withName(json.value)),
-      Writes(v => JsString(v.toString))
-    )
 }
