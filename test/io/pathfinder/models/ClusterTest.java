@@ -66,7 +66,7 @@ public class ClusterTest {
 
     public Commodity createCommodity() {
         Random rand = new Random();
-        return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), 0);
+        return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(),CommodityStatus.Waiting, 0);
     }
 
     private static <T> scala.collection.mutable.Buffer newList() {
