@@ -4,8 +4,7 @@ import com.avaje.ebean.Model
 import io.pathfinder.data.{ClusterQueries, Resource}
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
-import javax.persistence.{JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
-import play.api.libs.json.{Format,Json}
+import javax.persistence.{EnumType, Enumerated, JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
 import play.api.libs.json.{Writes, Format, Json}
 
 object Vehicle {
@@ -32,12 +31,14 @@ object Vehicle {
         latitude:  Option[Double],
         longitude: Option[Double],
         clusterId: Option[Long],
+        status:    Option[String],
         capacity:  Option[Int]
     ) extends Resource[Vehicle] {
         override def update(v: Vehicle): Option[Vehicle] = {
             latitude.foreach(v.latitude = _)
             longitude.foreach(v.longitude = _)
             capacity.foreach(v.capacity = _)
+            status.foreach(str => v.status = VehicleStatus.valueOf(str))
             clusterId.foreach {
                 Cluster.Dao.read(_).foreach(v.cluster = _)
             }
@@ -50,7 +51,8 @@ object Vehicle {
                 lng <- longitude
                 cap <- capacity
             } yield {
-                val v = Vehicle(id.getOrElse(0),lat,lng,cap)
+                val stat = status.getOrElse(VehicleStatus.Offline.toString)
+                val v = Vehicle(id.getOrElse(0),lat,lng,stat,cap)
                 v.cluster = c
                 v
             }
@@ -63,16 +65,18 @@ object Vehicle {
         } yield mod
     }
 
-    def apply(id: Long, latitude: Double, longitude: Double, capacity: Int): Vehicle = {
+    def apply(id: Long, latitude: Double, longitude: Double, status: String, capacity: Int): Vehicle = {
         val v = new Vehicle
         v.id = id
         v.latitude = latitude
         v.longitude = longitude
         v.capacity = capacity
+        v.status = VehicleStatus.valueOf(status)
         v
     }
 
-    def unapply(v: Vehicle): Option[(Long, Double, Double, Int)] = Some((v.id, v.latitude, v.longitude, v.capacity))
+    def unapply(v: Vehicle): Option[(Long, Double, Double, String, Int)] =
+        Some((v.id, v.latitude, v.longitude, v.status.toString, v.capacity))
 }
 
 @Entity
@@ -96,7 +100,11 @@ class Vehicle() extends Model with HasId with HasCluster {
     @JoinColumn
     var cluster: Cluster = null
 
+    @Column(nullable=false)
+    @Enumerated
+    var status: VehicleStatus = VehicleStatus.Offline
+
     override def toString = {
-        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + capacity + ")"
+        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + capacity + ", " + status + ")"
     }
 }

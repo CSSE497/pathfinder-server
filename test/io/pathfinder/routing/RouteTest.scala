@@ -8,7 +8,7 @@ import play.api.libs.json.Json
 class RouteTest extends PlaySpec {
 
     val routeJson = Json.parse("""{
-                "vehicle":{"id":9,"latitude":2,"longitude":3,"capacity":1},
+                "vehicle":{"id":9,"latitude":2,"longitude":3,"capacity":1,"status":"Online"},
                 "actions":[
                     { "action":"start","latitude":12,"longitude":18},
                     { "action":"pickup",
@@ -48,7 +48,7 @@ class RouteTest extends PlaySpec {
         (b,c) => b += new PickUp(c) += new DropOff(c)
     }.result()
 
-    val vehicle = Vehicle(9, 2, 3, 1)
+    val vehicle = Vehicle(9, 2, 3, "Online", 1)
 
     val route = Route(vehicle,actions)
 

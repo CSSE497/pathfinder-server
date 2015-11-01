@@ -9,7 +9,7 @@ import io.pathfinder.BaseAppTest;
 import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Commodity;
 import io.pathfinder.models.Vehicle;
-import org.junit.Assert;
+import io.pathfinder.models.VehicleStatus;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -29,7 +29,7 @@ public class WebSocketActorTest extends BaseAppTest {
     private static final JsValue JSON_CREATE_CLUSTER =
         Json.parse("{\"create\":{\"model\":\"Cluster\",\"value\":{}}}");
     private static final JsValue JSON_CREATE_VEHICLE =
-        Json.parse("{\"create\":{\"model\":\"Vehicle\",\"value\":{\"latitude\":0.1,\"longitude\":-12.3,\"clusterId\":1,\"capacity\":99}}}");
+        Json.parse("{\"create\":{\"model\":\"Vehicle\",\"value\":{\"latitude\":0.1,\"longitude\":-12.3,\"clusterId\":1,\"capacity\":99,\"status\":\"Online\"}}}");
     private static final JsValue JSON_CREATE_COMMODITY =
         Json.parse("{\"create\":{\"model\":\"Commodity\",\"value\":{\"startLatitude\":0.1,\"startLongitude\":-12.3,\"endLatitude\":99.4,\"endLongitude\":-3.5,\"clusterId\":1,\"param\":5}}}");
     private static final JsValue JSON_GET_CLUSTERS =
@@ -64,6 +64,7 @@ public class WebSocketActorTest extends BaseAppTest {
         createdVehicle.latitude_$eq(0.1);
         createdVehicle.longitude_$eq(-12.3);
         createdVehicle.capacity_$eq(99);
+        createdVehicle.status_$eq(VehicleStatus.Online);
         client.expectMsg(new WebSocketMessage.Created(
                 ModelTypes.Vehicle(), Vehicle.format().writes(createdVehicle)));
     }
