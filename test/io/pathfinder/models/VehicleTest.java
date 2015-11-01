@@ -29,6 +29,7 @@ public class VehicleTest extends BaseAppTest {
         assertEquals(7, actual.capacity());
         assertEquals(0.123, actual.latitude(), 0.001);
         assertEquals(4.567, actual.longitude(), 0.001);
+        assertEquals(VehicleStatus.Online, actual.status());
     }
 
     @Test
@@ -46,6 +47,7 @@ public class VehicleTest extends BaseAppTest {
         assertEquals(7, vehicle.capacity());
         assertEquals(0.123, vehicle.latitude(), 0.01);
         assertEquals(4.567, vehicle.longitude(), 0.01);
+        assertEquals(VehicleStatus.Offline, vehicle.status());
     }
 
     @Test

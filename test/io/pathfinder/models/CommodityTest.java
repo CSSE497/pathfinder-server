@@ -41,13 +41,14 @@ public class CommodityTest extends BaseAppTest {
     private static final double START_LONGITUDE = 3.89;
     private static final double END_LATITUDE = -12.3;
     private static final double END_LONGITUDE = 100.9;
+    private static final CommodityStatus STATUS = CommodityStatus.Waiting;
     private static final int PARAM = 5;
     private static final String JSON_COMMODITY = String.format(
-        "{\"id\":%d,\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"param\":%d}",
-        ID, START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, PARAM);
+        "{\"id\":%d,\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\",\"param\":%d}",
+        ID, START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM);
     private static final String JSON_PARTIAL_COMMODITY = String.format(
-        "{\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"param\":%d}",
-        START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, PARAM);
+        "{\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\", \"param\":%d}",
+        START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM);
 
     private JsonNode bodyForResult(Result r) {
         String resultBody;
@@ -65,7 +66,7 @@ public class CommodityTest extends BaseAppTest {
 
     @Test
     public void ebeanModelShouldBeValid() {
-        Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0, 1);
+        Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, 1);
         commodity.cluster_$eq(cluster);
         commodity.save();
         assertEquals(1, Commodity.finder().all().size());
@@ -80,6 +81,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLatitude", 8.0);
         body.put("endLongitude", 9.0);
         body.put("param", 42);
+        body.put("status",CommodityStatus.Waiting.name());
         body.put("clusterId", 1);
 
         RequestBuilder request = new RequestBuilder()
@@ -100,6 +102,7 @@ public class CommodityTest extends BaseAppTest {
         assertTrue("db record should have startLongitude", resultJson.hasNonNull("startLongitude"));
         assertTrue("db record should have endLatitude", resultJson.hasNonNull("endLatitude"));
         assertTrue("db record should have endLongitude", resultJson.hasNonNull("endLongitude"));
+        assertTrue("db record should have status", resultJson.hasNonNull("status"));
 
         // Ensure that the correct values were written to the database
         assertEquals("db record should have correct value for startLatitude",
@@ -110,6 +113,8 @@ public class CommodityTest extends BaseAppTest {
                 8.0, resultJson.findPath("endLatitude").asDouble(), .001);
         assertEquals("db record should have correct value for endLongitude",
                 9.0, resultJson.findPath("endLongitude").asDouble(), .001);
+        assertEquals("db record should have a correct value for status",
+                CommodityStatus.Waiting.name(), resultJson.findPath("status").asText());
     }
 
     @Test
@@ -178,8 +183,8 @@ public class CommodityTest extends BaseAppTest {
     }
 
     private void populateCommodities() {
-        Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, 5);
-        Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, 50);
+        Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, 5);
+        Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, 50);
         commodity1.cluster_$eq(cluster);
         commodity2.cluster_$eq(cluster);
         commodity1.save();
