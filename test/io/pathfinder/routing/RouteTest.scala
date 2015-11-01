@@ -1,6 +1,6 @@
 package io.pathfinder.routing
 
-import io.pathfinder.models.{Vehicle, Commodity}
+import io.pathfinder.models.{VehicleStatus, Vehicle, Commodity}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
 import org.scalatestplus.play.PlaySpec
 import play.api.libs.json.Json
@@ -48,7 +48,7 @@ class RouteTest extends PlaySpec {
         (b,c) => b += new PickUp(c) += new DropOff(c)
     }.result()
 
-    val vehicle = Vehicle(9, 2, 3, "Online", 1)
+    val vehicle = Vehicle(9, 2, 3, VehicleStatus.Online, 1)
 
     val route = Route(vehicle,actions)
 
