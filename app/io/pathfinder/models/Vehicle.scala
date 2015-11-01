@@ -4,7 +4,7 @@ import com.avaje.ebean.Model
 import io.pathfinder.data.{ClusterQueries, Resource}
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
-import javax.persistence.{EnumType, Enumerated, JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
+import javax.persistence.{Enumerated, JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
 import play.api.libs.json.{Writes, Format, Json}
 
 object Vehicle {
@@ -22,6 +22,7 @@ object Vehicle {
         override def writer: Writes[Vehicle] = Vehicle.format
     }
 
+    implicit val statusFormat: Format[VehicleStatus] = VehicleStatus.format
     implicit val format: Format[Vehicle] = Json.format[Vehicle]
 
     implicit val resourceFormat: Format[VehicleResource] = Json.format[VehicleResource]
@@ -31,14 +32,14 @@ object Vehicle {
         latitude:  Option[Double],
         longitude: Option[Double],
         clusterId: Option[Long],
-        status:    Option[String],
+        status:    Option[VehicleStatus],
         capacity:  Option[Int]
     ) extends Resource[Vehicle] {
         override def update(v: Vehicle): Option[Vehicle] = {
             latitude.foreach(v.latitude = _)
             longitude.foreach(v.longitude = _)
             capacity.foreach(v.capacity = _)
-            status.foreach(str => v.status = VehicleStatus.valueOf(str))
+            status.foreach(v.status = _)
             clusterId.foreach {
                 Cluster.Dao.read(_).foreach(v.cluster = _)
             }
@@ -51,7 +52,7 @@ object Vehicle {
                 lng <- longitude
                 cap <- capacity
             } yield {
-                val stat = status.getOrElse(VehicleStatus.Offline.toString)
+                val stat = status.getOrElse(VehicleStatus.Offline)
                 val v = Vehicle(id.getOrElse(0),lat,lng,stat,cap)
                 v.cluster = c
                 v
@@ -65,18 +66,18 @@ object Vehicle {
         } yield mod
     }
 
-    def apply(id: Long, latitude: Double, longitude: Double, status: String, capacity: Int): Vehicle = {
+    def apply(id: Long, latitude: Double, longitude: Double, status: VehicleStatus, capacity: Int): Vehicle = {
         val v = new Vehicle
         v.id = id
         v.latitude = latitude
         v.longitude = longitude
         v.capacity = capacity
-        v.status = VehicleStatus.valueOf(status)
+        v.status = status
         v
     }
 
-    def unapply(v: Vehicle): Option[(Long, Double, Double, String, Int)] =
-        Some((v.id, v.latitude, v.longitude, v.status.toString, v.capacity))
+    def unapply(v: Vehicle): Option[(Long, Double, Double, VehicleStatus, Int)] =
+        Some((v.id, v.latitude, v.longitude, v.status, v.capacity))
 }
 
 @Entity
