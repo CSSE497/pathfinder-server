@@ -24,6 +24,7 @@ object Commodity {
         override def writer: Writes[Commodity] = Commodity.format
     }
 
+    implicit val statusFormat = CommodityStatus.format
     implicit val format: Format[Commodity] = Json.format[Commodity]
     implicit val resourceFormat: Format[CommodityResource] = Json.format[CommodityResource]
 
@@ -33,6 +34,7 @@ object Commodity {
         endLatitude: Option[Double],
         startLongitude:  Option[Double],
         endLongitude: Option[Double],
+        status: Option[CommodityStatus],
         param:  Option[Int],
         clusterId: Option[Long]
     ) extends Resource[Commodity] {
@@ -42,6 +44,7 @@ object Commodity {
             endLatitude.foreach(c.endLatitude = _)
             endLongitude.foreach(c.endLongitude = _)
             param.foreach(c.param  = _)
+            status.foreach(c.status = _)
             Some(c)
         }
 
@@ -52,7 +55,15 @@ object Commodity {
                 endLongitude <- endLongitude
                 param <- param
             } yield {
-                val c = Commodity(0, startLatitude, startLongitude, endLatitude, endLongitude, param)
+                val c = Commodity(
+                    0,
+                    startLatitude,
+                    startLongitude,
+                    endLatitude,
+                    endLongitude,
+                    status.getOrElse(CommodityStatus.Inactive),
+                    param
+                )
                 c.cluster = cluster
                 c
             }
@@ -65,19 +76,20 @@ object Commodity {
     }
 
     def apply(id: Long, startLatitude: Double, startLongitude: Double, endLatitude: Double,
-              endLongitude: Double, param: Int): Commodity = {
+              endLongitude: Double, status: CommodityStatus, param: Int): Commodity = {
         val c = new Commodity
         c.id = id
         c.startLatitude = startLatitude
         c.startLongitude = startLongitude
         c.endLatitude = endLatitude
         c.endLongitude = endLongitude
+        c.status = status
         c.param = param
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, Int)] =
-        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.param))
+    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, Int)] =
+        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.status, c.param))
 }
 
 @Entity
@@ -99,6 +111,9 @@ class Commodity() extends Model with HasId with HasCluster {
 
     @Column(name="endLongitude", nullable=false)
     var endLongitude: Double = 0
+
+    @Column(nullable = false)
+    var status: CommodityStatus = CommodityStatus.Inactive
 
     @Column(name = "param")
     var param: Int = 0
