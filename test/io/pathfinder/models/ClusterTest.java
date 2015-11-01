@@ -61,7 +61,7 @@ public class ClusterTest {
 
     public Vehicle createVehicle() {
         Random rand = new Random();
-        return Vehicle.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextInt());
+        return Vehicle.apply(id_count++, rand.nextDouble(), rand.nextDouble(), "Online", rand.nextInt());
     }
 
     public Commodity createCommodity() {

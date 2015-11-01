@@ -13,7 +13,7 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(JUnit4.class)
 public class VehicleTest extends BaseAppTest {
-    private final String JSON_VEHICLE = "{\"id\":1,\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7}";
+    private final String JSON_VEHICLE = "{\"id\":1,\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7,\"status\":\"Online\"}";
     private final String JSON_PARTIAL_VEHICLE = "{\"latitude\":0.123,\"longitude\":4.567,\"capacity\":7}";
 
     @Test
