@@ -92,15 +92,15 @@ public class ClusterTest {
         vehicle2.save();
         vehicle3.save();
 
-        Cluster cluster4 = Cluster.apply(id_count++, newList(), newList());
+        Cluster cluster4 = Cluster.apply(id_count++, newList(), newList(), newList());
         cluster4.save();
-        Cluster cluster3 = Cluster.apply(id_count++, newList(), newList());
+        Cluster cluster3 = Cluster.apply(id_count++, newList(), newList(), newList());
         cluster3.save();
-        Cluster cluster2 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle3.id())), wrap(Arrays.asList(commodity3.id())));
+        Cluster cluster2 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle3.id())), wrap(Arrays.asList(commodity3.id())), newList());
         cluster2.save();
-        Cluster cluster1 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle2.id())), wrap(Arrays.asList(commodity2.id())));
+        Cluster cluster1 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle2.id())), wrap(Arrays.asList(commodity2.id())), newList());
         cluster1.save();
-        Cluster mainCluster = Cluster.apply(id_count++, newList(), newList());
+        Cluster mainCluster = Cluster.apply(id_count++, newList(), newList(), wrap(Arrays.asList(cluster1,cluster2,cluster3,cluster4)));
         mainCluster.save();
         return mainCluster;
     }
