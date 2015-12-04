@@ -57,7 +57,7 @@ class WebSocketActor (
                         }.getOrElse(Error("Subscribe requires either a model id or a cluster id"))
                     }.getOrElse(Error ("Can only subscribe to vehicles or commodities"))
                 case RouteSubscribe(model, id) =>
-                    if(Router.RouteSubscriber.subscribe(client, model, id))
+                    if(Router.subscribeToRoute(client, model, id))
                         client ! RouteSubscribed(model, id)
                     else
                         client ! Error("id: "+id+" not found for model: "+model)

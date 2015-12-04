@@ -16,7 +16,7 @@ object Global extends GlobalSettings {
 
     override def onStart(app: Application) {
         Logger.info("Application has started.")
-        Router.init()
+        Router
     }
 
     override def onStop(app: Application) {

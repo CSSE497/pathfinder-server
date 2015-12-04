@@ -2,7 +2,6 @@ package io.pathfinder.websockets.pushing
 
 import akka.actor.{Props, ActorRef}
 import akka.event.{LookupClassification, ActorEventBus}
-import io.pathfinder.websockets.WebSocketMessage
 import play.Logger
 
 object SocketMessagePusher {
@@ -11,7 +10,7 @@ object SocketMessagePusher {
 
 class SocketMessagePusher[K] extends EventBusActor with ActorEventBus with LookupClassification {
 
-    override type Event = (K, WebSocketMessage) // id and message
+    override type Event = (K, Any) // id and message
 
     override type Classifier = K // cluster id
 

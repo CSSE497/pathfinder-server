@@ -1,85 +1,63 @@
 package io.pathfinder.routing
 
-import akka.actor.{Props, ActorRef}
+import akka.actor.ActorRef
 import akka.event.{LookupClassification, ActorEventBus}
-import akka.pattern.ask
 import akka.util.Timeout
 import io.pathfinder.config.Global
-import io.pathfinder.models.{Cluster, Commodity, Vehicle}
-import io.pathfinder.routing.ClusterRouter.Recalculate
-import io.pathfinder.websockets.pushing.EventBusActor
-import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage
-import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.{Subscribe, Publish}
-import io.pathfinder.websockets.{ModelTypes, Events}
+import io.pathfinder.models.{HasCluster, Cluster, Commodity, Vehicle}
+import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage
+import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{ClusterEvent, RouteRequest}
+import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Subscribe
+import io.pathfinder.websockets.{Events, ModelTypes}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object Router {
-
-    // This can be used to force the initialization of the static code in this class from Java.
-    def init(): Unit = {}
-
-    // all other codes should use this value to communicate with the router actor
-    val ref: ActorRef = Global.actorSystem.actorOf(Props(classOf[Router]))
-    implicit val timeout = Timeout(2.seconds) // used for the recalculation futures used right below
-
-    // TODO: actually check that subscriptions are made correctly, may require rewriting code to use Futures
-    object RouteSubscriber {
-        def subscribe(client: ActorRef, model: ModelTypes.Value, id: Long): Boolean = {
-            val cluster = model match {
-                case ModelTypes.Vehicle =>
-                    Vehicle.Dao.read(id).getOrElse(return false).cluster
-                case ModelTypes.Commodity =>
-                    Commodity.Dao.read(id).getOrElse(return false).cluster
-                case ModelTypes.Cluster =>
-                    (ref ? Publish(id, Subscribe(client, (ModelTypes.Cluster, id)))).onComplete{
-                        x => ref ! Publish((id, Recalculate)) // recalculate to send pushes to newly registered (as well as old)
-                                               // websockets, this really should be replaced with something less silly
-                    }
-                    return true
-            }
-            (ref ? Publish(cluster.id, Subscribe(client, (model, id)))).onComplete{x => ref ! Publish((cluster.id, Recalculate))} // read above
-            true
-        }
-    }
-}
-
 /**
- * The Router is an actor that is responsible for dispatching subscription requests and route updates to cluster routers.
+ * The Router is an object that is responsible for dispatching subscription requests and route updates to cluster routers.
  */
-class Router extends EventBusActor with ActorEventBus with LookupClassification {
-
-    if(Router.ref != self){
-        throw new Error("Router Actor must be a singleton")
-    }
-
-    // populate the cluster routers
-    Cluster.Dao.readAll.foreach{
-        cluster =>
-            subscribe(
-                Global.actorSystem.actorOf(ClusterRouter.props(cluster)),
-                cluster.id
-            )
-    }
-
-    override def receive: Receive = {
-        case (Events.Created, cluster: Cluster) =>
-            subscribe(Global.actorSystem.actorOf(ClusterRouter.props(cluster)), cluster.id)
-        case (Events.Deleted, cluster: Cluster) =>
-            subscribers.remove(cluster.id).foreach(
-                _.foreach(Global.actorSystem.stop)
-            )
-        case Publish((id: Long, Recalculate)) => publish((id,Right(Recalculate)))
-        case Publish((id: Long, msg: EventBusMessage)) => publish((id,Left(msg)))
-        case _Else => super.receive(_Else)
-    }
+object Router extends ActorEventBus with LookupClassification {
 
     override type Classifier = Long // cluster id
-    override type Event = (Long, Either[EventBusMessage,Recalculate.type]) // cluster id and cluster router message
+    override type Event = (Long, Any) // cluster id and message to cluster router
 
     override protected def classify(event: Event): Classifier = event._1
 
     override protected def mapSize(): Int = 16
 
     override protected def publish(event: Event, subscriber: ActorRef): Unit = subscriber ! event._2
+
+    def subscribeToRoute(client: ActorRef, model: ModelTypes.Value, id:Long): Boolean = {
+
+        implicit val timeout = Timeout(2.seconds) // used for the recalculation futures used right below
+
+        val cluster = model match {
+            case ModelTypes.Vehicle =>
+                Vehicle.Dao.read(id).getOrElse(return false).cluster
+            case ModelTypes.Commodity =>
+                Commodity.Dao.read(id).getOrElse(return false).cluster
+            case ModelTypes.Cluster =>
+                Cluster.Dao.read(id).getOrElse(return false)
+        }
+        if(subscribers.findValue(cluster.id)(x => true).isEmpty){
+            val clusterRouter = Global.actorSystem.actorOf(ClusterRouter.props(cluster))
+            subscribe(
+                clusterRouter,
+                cluster.id
+            )
+            cluster.descendants.foreach{
+                parent => subscribe(clusterRouter, parent.id)
+            }
+        }
+        publish((cluster.id, Subscribe(client, (model, id))))
+        publish(cluster, RouteRequest(client, model, id))
+        true
+    }
+
+    def publish(cluster: Cluster, msg: ClusterRouterMessage): Unit = {
+        publish((cluster.id, msg))
+    }
+
+    def publish(event: Events.Value, model: HasCluster): Unit = {
+        publish(model.cluster, ClusterEvent(event, model))
+    }
 }

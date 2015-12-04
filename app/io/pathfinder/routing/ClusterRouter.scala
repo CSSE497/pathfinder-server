@@ -1,14 +1,14 @@
 package io.pathfinder.routing
 
-import akka.actor.{PoisonPill, ActorRef, Props}
+import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
-import io.pathfinder.models.{Commodity, Vehicle, Cluster}
+import com.avaje.ebean.Model
+import io.pathfinder.models.{HasCluster, Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
-import io.pathfinder.routing.ClusterRouter.Recalculate
+import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.WebSocketMessage.Routed
 import io.pathfinder.websockets.pushing.EventBusActor
-import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Publish
-import io.pathfinder.websockets.ModelTypes
+import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.libs.json.{JsNumber, JsObject, Writes, JsValue}
 
@@ -17,7 +17,16 @@ import scala.collection.mutable
 
 object ClusterRouter {
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
-    case object Recalculate
+    abstract sealed class ClusterRouterMessage
+
+    object ClusterRouterMessage {
+
+        /*** For when an item in the route is updated **/
+        case class ClusterEvent(event: Events.Value, model: Model) extends ClusterRouterMessage
+
+        /*** For when a client requests to see a specific route **/
+        case class RouteRequest(client: ActorRef, modelType: ModelTypes.Value, id: Long) extends ClusterRouterMessage
+    }
 }
 
 class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus with LookupClassification {
@@ -49,9 +58,12 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
     override protected def mapSize(): Int = 16
 
+    /*
+     * The cluster router just recalculates whenever a route request or update occurs
+     */
     override def receive: Receive = {
-        case e: Either[_,_] => e.fold(self ! _, self ! _)
-        case Recalculate => recalculate() // calling refresh will update the cluster model instance
+        case ClusterEvent(event , model) => recalculate()
+        case RouteRequest(client, model, id) => recalculate()
         case _Else => super.receive(_Else)
     }
 
@@ -60,8 +72,9 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
             Logger.warn("Cluster with id: "+clusterId+" missing")
             return
         }
-        val vehicles = cluster.vehicles
-        val commodities = cluster.commodities
+        val vehicles = cluster.descendants.map(_.vehicles).fold(cluster.vehicles)(_ ++ _)
+        val commodities = cluster.descendants.map(_.commodities).fold(cluster.commodities)(_ ++ _)
+
         if (vehicles.size <= 0) {
             Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
             return
