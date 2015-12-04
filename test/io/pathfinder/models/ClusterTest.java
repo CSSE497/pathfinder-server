@@ -3,6 +3,9 @@ package io.pathfinder.models;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import play.api.libs.json.JsNumber;
+import play.api.libs.json.JsObject;
+import play.api.libs.json.JsValue;
 import play.libs.Json;
 import play.mvc.Result;
 import play.test.Helpers;
@@ -22,6 +25,9 @@ import scala.collection.JavaConversions;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import scala.collection.mutable.HashMap;
+import scala.collection.mutable.Map;
+import scala.math.BigDecimal;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -61,12 +67,16 @@ public class ClusterTest {
 
     public Vehicle createVehicle() {
         Random rand = new Random();
-        return Vehicle.apply(id_count++, rand.nextDouble(), rand.nextDouble(), VehicleStatus.Online, rand.nextInt());
+        Map<String,JsValue> meta = new HashMap<>();
+        meta.put("capacity", new JsNumber(BigDecimal.valueOf(rand.nextInt())));
+        return Vehicle.apply(id_count++, rand.nextDouble(), rand.nextDouble(), VehicleStatus.Online, new JsObject(meta));
     }
 
     public Commodity createCommodity() {
         Random rand = new Random();
-        return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(),CommodityStatus.Waiting, 0);
+        Map<String,JsValue> meta = new HashMap<>();
+        meta.put("volume", new JsNumber(BigDecimal.valueOf(rand.nextInt())));
+        return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(),CommodityStatus.Waiting, new JsObject(meta));
     }
 
     private static <T> scala.collection.mutable.Buffer newList() {
