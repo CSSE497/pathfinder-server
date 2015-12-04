@@ -4,7 +4,7 @@ import javax.persistence.{GenerationType, Column, Id, Entity, GeneratedValue, Jo
 
 import com.avaje.ebean.Model
 
-import io.pathfinder.data.{ClusterQueries, Resource}
+import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
 
@@ -13,11 +13,7 @@ import play.api.libs.json.{JsObject, Writes, Json, Format}
 object Commodity {
     val finder: Model.Find[Long,Commodity] = new Model.Finder[Long,Commodity](classOf[Commodity])
 
-    object Dao extends WebSocketDao[Commodity](finder) with ClusterQueries[Long, Commodity] {
-        override def readByCluster(c: Cluster): Seq[Commodity] = {
-            c.refresh()
-            c.commodities
-        }
+    object Dao extends WebSocketDao[Commodity](finder) {
 
         override def modelType: ModelTypes.Value = ModelTypes.Commodity
 

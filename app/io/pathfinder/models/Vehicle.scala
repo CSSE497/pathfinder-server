@@ -1,7 +1,7 @@
 package io.pathfinder.models
 
 import com.avaje.ebean.Model
-import io.pathfinder.data.{ClusterQueries, Resource}
+import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
 import javax.persistence.{Enumerated, JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
@@ -11,11 +11,7 @@ object Vehicle {
 
     val finder: Model.Find[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
 
-    object Dao extends WebSocketDao[Vehicle](finder) with ClusterQueries[Long, Vehicle] {
-        override def readByCluster(c: Cluster): Seq[Vehicle] = {
-            c.refresh()
-            c.vehicles
-        }
+    object Dao extends WebSocketDao[Vehicle](finder) {
 
         override def modelType: ModelTypes.Value = ModelTypes.Vehicle
 
