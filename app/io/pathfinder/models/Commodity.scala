@@ -1,23 +1,19 @@
 package io.pathfinder.models
 
-import javax.persistence._
+import javax.persistence.{GenerationType, Column, Id, Entity, GeneratedValue, JoinColumn, ManyToOne}
 
 import com.avaje.ebean.Model
 
-import io.pathfinder.data.{ClusterQueries, Resource}
+import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
 
-import play.api.libs.json.{Writes, Json, Format}
+import play.api.libs.json.{JsObject, Writes, Json, Format}
 
 object Commodity {
     val finder: Model.Find[Long,Commodity] = new Model.Finder[Long,Commodity](classOf[Commodity])
 
-    object Dao extends WebSocketDao[Commodity](finder) with ClusterQueries[Long, Commodity] {
-        override def readByCluster(c: Cluster): Seq[Commodity] = {
-            c.refresh()
-            c.commodities
-        }
+    object Dao extends WebSocketDao[Commodity](finder) {
 
         override def modelType: ModelTypes.Value = ModelTypes.Commodity
 
@@ -35,7 +31,7 @@ object Commodity {
         startLongitude:  Option[Double],
         endLongitude: Option[Double],
         status: Option[CommodityStatus],
-        param:  Option[Int],
+        metadata:  Option[JsObject],
         clusterId: Option[Long]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
@@ -43,7 +39,7 @@ object Commodity {
             startLongitude.foreach(c.startLongitude = _)
             endLatitude.foreach(c.endLatitude = _)
             endLongitude.foreach(c.endLongitude = _)
-            param.foreach(c.param  = _)
+            metadata.foreach(c.metadata  = _)
             status.foreach(c.status = _)
             Some(c)
         }
@@ -53,7 +49,6 @@ object Commodity {
                 startLongitude <- startLongitude
                 endLatitude <- endLatitude
                 endLongitude <- endLongitude
-                param <- param
             } yield {
                 val c = Commodity(
                     0,
@@ -62,7 +57,7 @@ object Commodity {
                     endLatitude,
                     endLongitude,
                     status.getOrElse(CommodityStatus.Inactive),
-                    param
+                    metadata.getOrElse(JsObject(Seq.empty))
                 )
                 c.cluster = cluster
                 c
@@ -76,7 +71,7 @@ object Commodity {
     }
 
     def apply(id: Long, startLatitude: Double, startLongitude: Double, endLatitude: Double,
-              endLongitude: Double, status: CommodityStatus, param: Int): Commodity = {
+              endLongitude: Double, status: CommodityStatus, metadata: JsObject): Commodity = {
         val c = new Commodity
         c.id = id
         c.startLatitude = startLatitude
@@ -84,12 +79,12 @@ object Commodity {
         c.endLatitude = endLatitude
         c.endLongitude = endLongitude
         c.status = status
-        c.param = param
+        c.metadata = metadata
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, Int)] =
-        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.status, c.param))
+    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject)] =
+        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.status, c.metadata))
 }
 
 @Entity
@@ -115,8 +110,8 @@ class Commodity() extends Model with HasId with HasCluster {
     @Column(nullable = false)
     var status: CommodityStatus = CommodityStatus.Inactive
 
-    @Column(name = "param")
-    var param: Int = 0
+    @Column(length = 255)
+    var metadata: JsObject = JsObject(Seq.empty)
 
     @JoinColumn
     @ManyToOne

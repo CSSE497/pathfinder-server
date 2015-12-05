@@ -6,8 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.pathfinder.BaseAppTest;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import play.api.libs.json.JsResult;
-import play.api.libs.json.Json;
+import play.api.libs.json.*;
 
 import play.mvc.Result;
 import play.test.Helpers;
@@ -15,9 +14,7 @@ import play.mvc.Http.RequestBuilder;
 import play.test.FakeApplication;
 import play.core.j.JavaResultExtractor;
 
-import org.junit.After;
 import org.junit.Test;
-import org.junit.Before;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
@@ -26,14 +23,16 @@ import static org.junit.Assert.fail;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import scala.Option;
+import scala.collection.mutable.HashMap;
+import scala.collection.mutable.Map;
 
+import scala.math.BigDecimal;
 import java.util.LinkedList;
 import java.util.List;
 
 @RunWith(JUnit4.class)
 public class CommodityTest extends BaseAppTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
-    private FakeApplication fakeApp;
 
     private static final double TOLERANCE = 0.00001;
     private static final int ID = 13;
@@ -44,10 +43,10 @@ public class CommodityTest extends BaseAppTest {
     private static final CommodityStatus STATUS = CommodityStatus.Waiting;
     private static final int PARAM = 5;
     private static final String JSON_COMMODITY = String.format(
-        "{\"id\":%d,\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\",\"param\":%d}",
+        "{\"id\":%d,\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\",\"metadata\":{\"param\":%d}}",
         ID, START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM);
     private static final String JSON_PARTIAL_COMMODITY = String.format(
-        "{\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\", \"param\":%d}",
+        "{\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\", \"metadata\":{\"param\":%d}}",
         START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM);
 
     private JsonNode bodyForResult(Result r) {
@@ -64,9 +63,15 @@ public class CommodityTest extends BaseAppTest {
         }
     }
 
+    private static JsObject getParameter(int weight){
+        Map<String,JsValue> meta = new HashMap<>();
+        meta.put("param", new JsNumber(BigDecimal.valueOf(weight)));
+        return new JsObject(meta);
+    }
+
     @Test
     public void ebeanModelShouldBeValid() {
-        Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, 1);
+        Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, getParameter(1));
         commodity.cluster_$eq(cluster);
         commodity.save();
         assertEquals(1, Commodity.finder().all().size());
@@ -75,12 +80,15 @@ public class CommodityTest extends BaseAppTest {
     @Test
     public void validPostShouldCreateCommodity() {
         ObjectNode body = jsonNodeFactory.objectNode();
+        ObjectNode meta = jsonNodeFactory.objectNode();
+
+        meta.put("param", 42);
 
         body.put("startLatitude", 6.0);
         body.put("startLongitude", 7.0);
         body.put("endLatitude", 8.0);
         body.put("endLongitude", 9.0);
-        body.put("param", 42);
+        body.put("param", meta);
         body.put("status",CommodityStatus.Waiting.name());
         body.put("clusterId", 1);
 
@@ -120,12 +128,15 @@ public class CommodityTest extends BaseAppTest {
     @Test
     public void validPostShouldCreateCommodityWithParam() {
         ObjectNode body = jsonNodeFactory.objectNode();
+        ObjectNode meta = jsonNodeFactory.objectNode();
+        meta.put("param",5);
 
         body.put("startLatitude", 1.0);
         body.put("startLongitude", 2.0);
         body.put("endLatitude", 3.0);
         body.put("endLongitude", 4.0);
-        body.put("param", 5);
+
+        body.put("metadata", meta);
         body.put("clusterId", 1);
 
         RequestBuilder request = new RequestBuilder()
@@ -144,7 +155,7 @@ public class CommodityTest extends BaseAppTest {
         assertTrue("db record should have startLongitude", resultJson.hasNonNull("startLongitude"));
         assertTrue("db record should have endLatitude", resultJson.hasNonNull("endLatitude"));
         assertTrue("db record should have endLongitude", resultJson.hasNonNull("endLongitude"));
-        assertTrue("db record should have param", resultJson.hasNonNull("param"));
+        assertTrue("db record should have param", resultJson.hasNonNull("metadata"));
 
         // Ensure that the correct values were written to the database
         assertEquals("db record should have correct value for startLatitude",
@@ -156,7 +167,7 @@ public class CommodityTest extends BaseAppTest {
         assertEquals("db record should have correct value for endLongitude",
                 4.0, resultJson.findPath("endLongitude").asDouble(), .001);
         assertEquals("db record should have correct value for param",
-                5, resultJson.findPath("param").asInt());
+                5, resultJson.findPath("metadata").findPath("param").asInt());
     }
 
     @Test
@@ -183,8 +194,8 @@ public class CommodityTest extends BaseAppTest {
     }
 
     private void populateCommodities() {
-        Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, 5);
-        Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, 50);
+        Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, getParameter(5));
+        Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, getParameter(50));
         commodity1.cluster_$eq(cluster);
         commodity2.cluster_$eq(cluster);
         commodity1.save();
@@ -296,7 +307,7 @@ public class CommodityTest extends BaseAppTest {
         assertEquals(START_LONGITUDE, actual.startLongitude(), TOLERANCE);
         assertEquals(END_LATITUDE, actual.endLatitude(), TOLERANCE);
         assertEquals(END_LONGITUDE, actual.endLongitude(), TOLERANCE);
-        assertEquals(PARAM, actual.param());
+        assertEquals(PARAM, ((JsNumber)actual.metadata().value().get("param").get()).value().toInt());
     }
 
     @Test
@@ -315,6 +326,6 @@ public class CommodityTest extends BaseAppTest {
         assertEquals(START_LONGITUDE, actual.startLongitude(), TOLERANCE);
         assertEquals(END_LATITUDE, actual.endLatitude(), TOLERANCE);
         assertEquals(END_LONGITUDE, actual.endLongitude(), TOLERANCE);
-        assertEquals(PARAM, actual.param());
+        assertEquals(PARAM, ((JsNumber)actual.metadata().value().get("param").get()).value().toInt());
     }
 }

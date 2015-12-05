@@ -14,8 +14,13 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import play.api.libs.json.JsNumber;
+import play.api.libs.json.JsObject;
 import play.api.libs.json.JsValue;
 import play.api.libs.json.Json;
+import scala.collection.mutable.HashMap;
+import scala.collection.mutable.Map;
+import scala.math.BigDecimal;
 
 /**
  * This test was based off of the documentation at
@@ -29,9 +34,27 @@ public class WebSocketActorTest extends BaseAppTest {
     private static final JsValue JSON_CREATE_CLUSTER =
         Json.parse("{\"create\":{\"model\":\"Cluster\",\"value\":{}}}");
     private static final JsValue JSON_CREATE_VEHICLE =
-        Json.parse("{\"create\":{\"model\":\"Vehicle\",\"value\":{\"latitude\":0.1,\"longitude\":-12.3,\"clusterId\":1,\"capacity\":99,\"status\":\"Online\"}}}");
+        Json.parse("{\"create\":{" +
+                        "\"model\":\"Vehicle\"," +
+                        "\"value\":{" +
+                            "\"latitude\":0.1," +
+                            "\"longitude\":-12.3," +
+                            "\"clusterId\":1," +
+                            "\"metadata\":{\"capacity\":99}," +
+                            "\"status\":\"Online\"" +
+                        "}" +
+                    "}}");
     private static final JsValue JSON_CREATE_COMMODITY =
-        Json.parse("{\"create\":{\"model\":\"Commodity\",\"value\":{\"startLatitude\":0.1,\"startLongitude\":-12.3,\"endLatitude\":99.4,\"endLongitude\":-3.5,\"clusterId\":1,\"param\":5}}}");
+        Json.parse("{\"create\":{" +
+                        "\"model\":\"Commodity\"," +
+                        "\"value\":{\"startLatitude\":0.1," +
+                            "\"startLongitude\":-12.3," +
+                            "\"endLatitude\":99.4," +
+                            "\"endLongitude\":-3.5," +
+                            "\"clusterId\":1," +
+                            "\"metadata\":{\"param\":5}" +
+                        "}" +
+                    "}}");
     private static final JsValue JSON_GET_CLUSTERS =
         Json.parse("{\"getApplicationCluster\":{\"id\":\""+APPLICATION_ID+"\"}}");
 
@@ -63,7 +86,9 @@ public class WebSocketActorTest extends BaseAppTest {
         createdVehicle.id_$eq(NEXT_UNUSED_ID);
         createdVehicle.latitude_$eq(0.1);
         createdVehicle.longitude_$eq(-12.3);
-        createdVehicle.capacity_$eq(99);
+        Map<String,JsValue> meta = new HashMap<>();
+        meta.put("capacity", new JsNumber(BigDecimal.valueOf(99)));
+        createdVehicle.metadata_$eq(new JsObject(meta));
         createdVehicle.status_$eq(VehicleStatus.Online);
         client.expectMsg(new WebSocketMessage.Created(
                 ModelTypes.Vehicle(), Vehicle.format().writes(createdVehicle)));
@@ -79,7 +104,9 @@ public class WebSocketActorTest extends BaseAppTest {
         createdCommodity.startLongitude_$eq(-12.3);
         createdCommodity.endLatitude_$eq(99.4);
         createdCommodity.endLongitude_$eq(-3.5);
-        createdCommodity.param_$eq(5);
+        Map<String,JsValue> meta = new HashMap<>();
+        meta.put("param", new JsNumber(BigDecimal.valueOf(5)));
+        createdCommodity.metadata_$eq(new JsObject(meta));
         client.expectMsg(new WebSocketMessage.Created(
             ModelTypes.Commodity(), Commodity.format().writes(createdCommodity)));
     }

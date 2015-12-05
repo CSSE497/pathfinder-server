@@ -51,12 +51,12 @@ object Cluster {
             vehicles.foreach(
                 _.foreach {
                     vehicleResource => model.vehicles += (
-                      for {
-                          id <- vehicleResource.id
-                          model <- Vehicle.Dao.read(id)
-                          update <- vehicleResource.update(model)
-                      } yield update
-                      ).orElse(vehicleResource.create(model)).getOrElse(return None)
+                        for {
+                            id <- vehicleResource.id
+                            model <- Vehicle.Dao.read(id)
+                            update <- vehicleResource.update(model)
+                        } yield update
+                    ).orElse(vehicleResource.create(model)).getOrElse(return None)
                 }
             )
             commodities.foreach(
