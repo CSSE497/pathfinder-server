@@ -90,9 +90,6 @@ class Vehicle() extends Model with HasId with HasCluster {
     @Column(nullable=false)
     var longitude: Double = 0
 
-    @Column(nullable=false)
-    var capacity: Int = 0
-
     @ManyToOne
     @JoinColumn
     var cluster: Cluster = null
@@ -105,6 +102,6 @@ class Vehicle() extends Model with HasId with HasCluster {
     var metadata: JsObject = JsObject(Seq.empty)
 
     override def toString = {
-        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + capacity + ", " + status + "," + metadata +")"
+        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + status + ", " + metadata +")"
     }
 }
