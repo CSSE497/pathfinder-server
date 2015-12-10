@@ -3,7 +3,7 @@ package io.pathfinder.routing
 import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import com.avaje.ebean.Model
-import io.pathfinder.models.{HasCluster, Commodity, Vehicle, Cluster}
+import io.pathfinder.models.{Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.WebSocketMessage.Routed
@@ -12,12 +12,42 @@ import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.libs.json.{JsNumber, JsObject, Writes, JsValue}
 
+import dispatch.{Res, Req, url, Http}
+
+import scala.concurrent.{Future, Promise}
+
 import scala.Function._
 import scala.collection.mutable
+
+import ClusterRouter._
 
 object ClusterRouter {
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
     abstract sealed class ClusterRouterMessage
+
+    private def googleMapsRequest(origins: TraversableOnce[(Double,Double)], dests: TraversableOnce[(Double,Double)]): Future[Res] =
+        Http(url("https://maps.googleapis.com/maps/api/distancematrix/json?" +
+            "origins=" + origins.map(latlng => String.format("%.4f,%.4f",latlng._1,latlng._2)).mkString("|") + "&" +
+            "destinations=" + dests.map(latlng => String.format("%.4f,%.4f",latlng._1,latlng._2)).mkString("|")))
+
+    private def parseRes(res: Res): Array[Double] = {
+        print(res.getResponseBody)
+        Array()
+    }
+
+    private def distances(origins: Seq[(Double,Double)], dests: Seq[(Double,Double)]): Future[Array[Array[Double]]] =
+        Future.sequence(
+            origins.map[Future[Array[Double]],Iterator[Future[Array[Double]]]](
+                o => googleMapsRequest(Iterator.fill(dests.size)(o), dests).map(parseRes)
+            )
+        ).map(_.toArray)
+
+    private def removeDiagonals(param: Array[Array[Double]]): Array[Array[Double]] = {
+        (0 to param.length).foreach(
+            i => param(i)(i) = -1
+        )
+        param
+    }
 
     object ClusterRouterMessage {
 
@@ -74,7 +104,20 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
         }
         val vehicles = cluster.descendants.map(_.vehicles).fold(cluster.vehicles)(_ ++ _)
         val commodities = cluster.descendants.map(_.commodities).fold(cluster.commodities)(_ ++ _)
-
+        val vehicleIds = vehicles.map(_.id)
+        val comIds = commodities.map(_.id)
+        val starts = vehicles.map(x => (x.latitude, x.longitude))
+        val pickups = commodities.map(c => (c.startLatitude, c.startLongitude))
+        val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
+        for {
+            startsToPickups <- distances(starts, pickups)
+            pickupsToDropOffs <- distances(pickups, dropOffs)
+            pickUpsToPickUps <- distances(pickups, pickups).map(removeDiagonals)
+            dropOffsToPickUps <- distances(dropOffs, pickups).map(removeDiagonals)
+            dropOffsToDropOffs <- distances(dropOffs, dropOffs).map(removeDiagonals)
+        } yield {
+            // send to server
+        }
         if (vehicles.size <= 0) {
             Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
             return
