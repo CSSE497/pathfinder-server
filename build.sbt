@@ -13,7 +13,6 @@ libraryDependencies ++= Seq(
   ws,
   filters,
   specs2 % Test,
-  "net.databinder.dispatch" %% "dispatch-core" % "0.11.3",
   "org.avaje.ebeanorm" % "avaje-ebeanorm" % "6.12.3",
   "postgresql" % "postgresql" % "9.1-901-1.jdbc4",
   "org.scalatest" %% "scalatest" % "2.2.1" % "test",

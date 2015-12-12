@@ -10,11 +10,14 @@ import io.pathfinder.websockets.WebSocketMessage.Routed
 import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
-import play.api.libs.json.{JsNumber, JsObject, Writes, JsValue}
-
-import dispatch.{Res, Req, url, Http}
-
+import play.api.libs.json.Reads.{ArrayReads, ObjectNodeReads}
+import play.api.libs.json.{JsError, JsResultException, JsSuccess, Reads, JsArray, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.ws.{WSResponse, WS}
+import play.api.Play.current
 import scala.concurrent.{Future, Promise}
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import play.api.libs.functional.syntax._
 
 import scala.Function._
 import scala.collection.mutable
@@ -22,32 +25,11 @@ import scala.collection.mutable
 import ClusterRouter._
 
 object ClusterRouter {
+
+    private val googleMaps = WS.url("https://maps.googleapis.com/maps/api/distancematrix/json")
+
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
     abstract sealed class ClusterRouterMessage
-
-    private def googleMapsRequest(origins: TraversableOnce[(Double,Double)], dests: TraversableOnce[(Double,Double)]): Future[Res] =
-        Http(url("https://maps.googleapis.com/maps/api/distancematrix/json?" +
-            "origins=" + origins.map(latlng => String.format("%.4f,%.4f",latlng._1,latlng._2)).mkString("|") + "&" +
-            "destinations=" + dests.map(latlng => String.format("%.4f,%.4f",latlng._1,latlng._2)).mkString("|")))
-
-    private def parseRes(res: Res): Array[Double] = {
-        print(res.getResponseBody)
-        Array()
-    }
-
-    private def distances(origins: Seq[(Double,Double)], dests: Seq[(Double,Double)]): Future[Array[Array[Double]]] =
-        Future.sequence(
-            origins.map[Future[Array[Double]],Iterator[Future[Array[Double]]]](
-                o => googleMapsRequest(Iterator.fill(dests.size)(o), dests).map(parseRes)
-            )
-        ).map(_.toArray)
-
-    private def removeDiagonals(param: Array[Array[Double]]): Array[Array[Double]] = {
-        (0 to param.length).foreach(
-            i => param(i)(i) = -1
-        )
-        param
-    }
 
     object ClusterRouterMessage {
 
@@ -56,6 +38,39 @@ object ClusterRouter {
 
         /*** For when a client requests to see a specific route **/
         case class RouteRequest(client: ActorRef, modelType: ModelTypes.Value, id: Long) extends ClusterRouterMessage
+    }
+
+    object DistanceFinder {
+
+        private def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] =
+            googleMaps.withQueryString(
+                "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
+                "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|")
+            ).get()
+
+        private val parseError: PartialFunction[JsError,Nothing] = {
+            case err: JsError =>
+                Logger.error("Failed to parse google maps api response: " + err.errors)
+                throw new JsResultException(err.errors)
+        }
+
+        private def parseResponse(res: WSResponse): Array[Array[Double]] =
+            res.json.validate(
+                (__ \ "rows").read[Array[JsValue]].map(
+                    _.map(_.validate(
+                        (__ \ "elements").read[Array[JsValue]].map(
+                            _.map[Double,Array[Double]](
+                                _.validate(
+                                    (__ \ "duration" \ "value").read[Double]
+                                ).recover(parseError).get
+                            )
+                        )
+                    ).recover(parseError).get)
+                )
+            ).recover(parseError).get
+
+        def findDistances(origins: Seq[(Double, Double)], dests: Seq[(Double, Double)]): Future[Array[Array[Double]]] =
+            makeRequest(origins, dests).map(parseResponse)
     }
 }
 
@@ -102,25 +117,35 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
             Logger.warn("Cluster with id: "+clusterId+" missing")
             return
         }
+        Logger.info("RECALCULATING")
         val vehicles = cluster.descendants.map(_.vehicles).fold(cluster.vehicles)(_ ++ _)
+        if (vehicles.size <= 0) {
+            Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
+            return
+        }
+        Logger.info("GOT VEHICLES")
         val commodities = cluster.descendants.map(_.commodities).fold(cluster.commodities)(_ ++ _)
-        val vehicleIds = vehicles.map(_.id)
-        val comIds = commodities.map(_.id)
+        if (commodities.size <= 0) {
+            Logger.info("someone asked for Router to recalculate but there are no commodities in cluster")
+            return
+        }
+        Logger.info("GOT COMMODITIES")
+        //val vehicleIds = vehicles.map(_.id)
+        //val comIds = commodities.map(_.id)
         val starts = vehicles.map(x => (x.latitude, x.longitude))
         val pickups = commodities.map(c => (c.startLatitude, c.startLongitude))
         val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
         for {
-            startsToPickups <- distances(starts, pickups)
-            pickupsToDropOffs <- distances(pickups, dropOffs)
-            pickUpsToPickUps <- distances(pickups, pickups).map(removeDiagonals)
-            dropOffsToPickUps <- distances(dropOffs, pickups).map(removeDiagonals)
-            dropOffsToDropOffs <- distances(dropOffs, dropOffs).map(removeDiagonals)
+            startsToPickups <- DistanceFinder.findDistances(starts, pickups)
+            pickupsToDropOffs <- DistanceFinder.findDistances(pickups, dropOffs)
+            pickUpsToPickUps <- DistanceFinder.findDistances(pickups, pickups)
+            dropOffsToPickUps <- DistanceFinder.findDistances(dropOffs, pickups)
+            dropOffsToDropOffs <- DistanceFinder.findDistances(dropOffs, dropOffs)
         } yield {
+            // process metadata
             // send to server
-        }
-        if (vehicles.size <= 0) {
-            Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
-            return
+            Logger.info("SENDING DATA")
+            // publish routes
         }
         Logger.info("Reticulating splines")
         val builders: Seq[mutable.Builder[Action, Seq[Action]]] = vehicles.map { Seq.newBuilder[Action] += new Start(_)}
@@ -139,7 +164,7 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
             JsObject(Seq(("id",JsNumber(cluster.id)))),
             Writes.seq(Route.writes).writes(routes)
         )
-        publish(((ModelTypes.Cluster,cluster.id), clusterRouted)) // send list of routes to cluster subscribers
+        //publish(((ModelTypes.Cluster,cluster.id), clusterRouted)) // send list of routes to cluster subscribers
         Logger.info("Finished recalculating routes:\n"+clusterRouted)
     }
 }
