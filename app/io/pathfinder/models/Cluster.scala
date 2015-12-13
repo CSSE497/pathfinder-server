@@ -128,7 +128,7 @@ class Cluster() extends Model with HasId {
         ).takeWhile(_.isDefined).map(_.get)
 
     def descendants: Iterator[Cluster] =             // each level            // combine all the levels
-        Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).flatten
+        Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
 
     override def toString = String.format(
         "Cluster(id: %s, vehicles: %s, commodities: %s)",
