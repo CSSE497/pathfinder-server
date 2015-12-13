@@ -11,11 +11,13 @@ import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
-import play.api.libs.json.{Reads, Json, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.json.{Json, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import play.api.libs.functional.syntax._
+import scala.language.postfixOps
 
 import ClusterRouter._
 
@@ -23,9 +25,15 @@ import scala.util.Try
 
 object ClusterRouter {
 
+    type Row = Array[Int]
+    type Matrix = Array[Row]
+
     private val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
         throw new Error("routing.server not defined in application.conf, routing will not work")
-    ))
+    )).withHeaders(
+        "Content-Type" -> "application/json",
+        "Accept" -> "application/json"
+    )
 
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
     abstract sealed class ClusterRouterMessage
@@ -49,23 +57,25 @@ object ClusterRouter {
                 "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|")
             ).get()
 
-        private def parseResponse(res: WSResponse): Try[Array[Array[Double]]] = Try[Array[Array[Double]]](
+        private def parseResponse(res: WSResponse): Try[(Matrix,Matrix)] = Try(
             res.json.validate(
                 (__ \ "rows").read[Array[JsValue]].map(
                     _.map(_.validate(
                         (__ \ "elements").read[Array[JsValue]].map(
                             _.map(
                                 _.validate(
-                                    (__ \ "duration" \ "value").read[Double]
+                                    (__ \ "distance" \ "value").read[Int] and
+                                    (__ \ "duration" \ "value").read[Int]
+                                    tupled
                                 ).get
-                            )
+                            ).unzip
                         )
-                    ).get)
+                    ).get).unzip
                 )
             ).get
         )
 
-        def findDistances(origins: Seq[(Double, Double)], dests: Seq[(Double, Double)]): Future[Array[Array[Double]]] =
+        def find(origins: Seq[(Double, Double)], dests: Seq[(Double, Double)]): Future[(Matrix,Matrix)] =
             makeRequest(origins, dests).map(parseResponse).flatMap(
                 _.recover{case t => return Future.failed(t)}.map(Future.successful).get
             )
@@ -120,7 +130,7 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
         case _Else => super.receive(_Else)
     }
 
-    val matrixWriter: Writes[Array[Array[Double]]] = Writes.arrayWrites[Array[Double]]//Json.writes[Array[Array[Double]]]
+    val matrixWriter: Writes[Matrix] = Writes.arrayWrites[Row]//Json.writes[Array[Array[Double]]]
 
     private def recalculate(): Unit = {
         val cluster: Cluster = Cluster.Dao.read(clusterId).getOrElse{
@@ -140,28 +150,58 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
             return
         }
         Logger.info("GOT COMMODITIES")
-        //val vehicleIds = vehicles.map(_.id)
-        //val comIds = commodities.map(_.id)
+
         val starts = vehicles.map(x => (x.latitude, x.longitude))
         val pickups = commodities.map(c => (c.startLatitude, c.startLongitude))
         val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
         (for {
-            startsToPickUps <- DistanceFinder.findDistances(starts, pickups)
-            pickUpsToDropOffs <- DistanceFinder.findDistances(pickups, dropOffs)
-            pickUpsToPickUps <- DistanceFinder.findDistances(pickups, pickups)
-            dropOffsToPickUps <- DistanceFinder.findDistances(dropOffs, pickups)
-            dropOffsToDropOffs <- DistanceFinder.findDistances(dropOffs, dropOffs)
+            (startToPickUpDist, startToPickUpDur) <- DistanceFinder.find(starts, pickups)
+            (pickUpToDropOffDist, pickUpToDropOffDur) <- DistanceFinder.find(pickups, dropOffs)
+            (pickUpToPickUpDist, pickUpToPickUpDur) <- DistanceFinder.find(pickups, pickups)
+            (dropOffToPickUpDist, dropOffToPickUpDur) <- DistanceFinder.find(dropOffs, pickups)
+            (dropOffToDropOffDist, dropOffToDropOffDur) <- DistanceFinder.find(dropOffs, dropOffs)
         } yield {
-            // process metadata
+            def makeMatrix(
+                startsToPickUps: Matrix,
+                pickUpsToDropOffs: Matrix,
+                pickUpsToPickUps: Matrix,
+                dropOffsToPickUps: Matrix,
+                dropOffsToDropOffs: Matrix
+            ) = JsArray((
+                    pickUpsToPickUps.zip(pickUpsToDropOffs).map(
+                        tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
+                    ) ++ dropOffsToPickUps.zip(dropOffsToDropOffs).map(
+                        tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
+                    ) ++ startsToPickUps.map(
+                        _ ++ Seq.fill(commodities.size)(0) ++ Seq.fill(vehicles.size)(0)
+                    )
+                ).map(row => JsArray(row.map(JsNumber(_)))))
+
+            val comTable = commodities.indices.map(num => Json.arr(JsNumber(num),JsNumber(num+commodities.size)))
+            val vehicleTable = vehicles.indices.map(num => JsNumber(num+2*commodities.size))
+            val body = JsObject(Seq(
+                "commodityParameters" -> JsArray(commodities.map(_.metadata)), // the parameters need to be preprocessed base
+                "vehicleParameters" -> JsArray(vehicles.map(_.metadata)),       // on user preferences somehow
+                "commodities" -> JsArray(comTable),
+                "vehicles" -> JsArray(vehicleTable),
+                "distances" -> makeMatrix(
+                    startToPickUpDist,
+                    pickUpToDropOffDist,
+                    pickUpToPickUpDist,
+                    dropOffToPickUpDist,
+                    dropOffToDropOffDist
+                ),
+                "durations" -> makeMatrix(
+                    startToPickUpDur,
+                    pickUpToDropOffDur,
+                    pickUpToPickUpDur,
+                    dropOffToPickUpDur,
+                    dropOffToDropOffDur
+                )
+            ))
+            Logger.info("Sending message: "+body)
             routingServer.post(
-                JsObject(Seq(
-                    "commodities" -> Json.arr(commodities.map(_.metadata)), // the parameters need to be preprocessed base
-                    "vehicles" -> Json.arr(vehicles.map(_.metadata)),       // on user preferences somehow
-                    "startsToPickUps" -> matrixWriter.writes(startsToPickUps),
-                    "pickUpsToDropOffs" -> matrixWriter.writes(pickUpsToDropOffs),
-                    "pickUpsToPickUps" -> matrixWriter.writes(pickUpsToPickUps),
-                    "dropOffsToDropOffs" -> matrixWriter.writes(dropOffsToDropOffs)
-                ))
+                body
             ).onComplete{ result =>
                 val w = result.recover{
                     case t : Throwable =>
@@ -187,6 +227,6 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 )
             }
             Logger.info("SENDING DATA")
-        }).onFailure{case t => Logger.error("Failed to route routes", t)}
+        }).onFailure{case t => Logger.error("Failed to request and receive route data from google maps api", t)}
     }
 }
