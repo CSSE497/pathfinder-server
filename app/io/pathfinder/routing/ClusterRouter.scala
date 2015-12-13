@@ -11,7 +11,7 @@ import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
-import play.api.libs.json.{Json, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.json.{JsString, Json, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.Future
@@ -177,13 +177,12 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                     )
                 ).map(row => JsArray(row.map(JsNumber(_)))))
 
-            val comTable = commodities.indices.map(num => Json.arr(JsNumber(num),JsNumber(num+commodities.size)))
-            val vehicleTable = vehicles.indices.map(num => JsNumber(num+2*commodities.size))
+            val comTable = JsObject(commodities.indices.map(num => (num.toString,JsNumber(num+commodities.size))))
+            val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num+2*commodities.size)))
             val body = JsObject(Seq(
-                "commodityParameters" -> JsArray(commodities.map(_.metadata)), // the parameters need to be preprocessed base
-                "vehicleParameters" -> JsArray(vehicles.map(_.metadata)),       // on user preferences somehow
-                "commodities" -> JsArray(comTable),
-                "vehicles" -> JsArray(vehicleTable),
+                "commodities" -> comTable,
+                "vehicles" -> vehicleTable,
+                "capacities" -> JsArray(),
                 "distances" -> makeMatrix(
                     startToPickUpDist,
                     pickUpToDropOffDist,
@@ -197,7 +196,10 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                     pickUpToPickUpDur,
                     dropOffToPickUpDur,
                     dropOffToDropOffDur
-                )
+                ),
+                "vehicleParameters" -> JsArray(),
+                "commodityParameters" -> JsArray(),
+                "objective" -> JsString("0")
             ))
             Logger.info("Sending message: "+body)
             routingServer.post(
@@ -211,16 +213,14 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 w.json.validate(
                     Reads.list(Reads.list(Reads.JsNumberReads.map(_.value.toInt))).map( routes =>
                         publish(routes.map{ arr =>
-                            val pickedUp = Array.fill(commodities.size)(false)
-                            val routeBuilder = Route.newBuilder(vehicles(arr.head))
-                            for(i <- 1 to arr.length) {
-                                if (pickedUp(i)) {
-                                    routeBuilder += new DropOff(commodities(i))
-                                } else {
+                            val routeBuilder = Route.newBuilder(vehicles(arr.head - 2 * commodities.size))
+                            arr.tail.foreach(
+                                i => if(i < commodities.size){
                                     routeBuilder += new PickUp(commodities(i))
-                                    pickedUp(i) = true
+                                } else {
+                                    routeBuilder += new DropOff(commodities(i - commodities.size))
                                 }
-                            }
+                            )
                             routeBuilder.result()
                         })
                     )
