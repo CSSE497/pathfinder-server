@@ -11,7 +11,7 @@ import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
-import play.api.libs.json.{JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.json.{JsSuccess, JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.Future
@@ -201,8 +201,19 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
             val comTable = JsObject(commodities.indices.map(num => ((num+1).toString,JsNumber(num+commodities.size+1))))
             val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num+2*commodities.size+1)))
-            val capacities = JsArray(commodities.map(_.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(0)))
-                                  ++ vehicles.map(_.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(0))))
+            val capacityRead: Reads[JsNumber] = (__ \ "capacity").read[JsNumber].orElse(
+                Reads(x => JsSuccess(JsNumber(0)))
+            )
+            val capacities = JsArray(Seq(
+                JsObject(
+                    commodities.zipWithIndex.map{
+                        case (com, i) => (i+1).toString -> com.metadata.validate(capacityRead).get
+                    } ++
+                    vehicles.zipWithIndex.map{
+                      case (veh, i) => (i+1+2*commodities.size).toString -> veh.metadata.validate(capacityRead).get
+                    }
+                )
+            ))
             val body = JsObject(Seq(
                 "commodities" -> comTable,
                 "vehicles" -> vehicleTable,
