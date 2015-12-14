@@ -11,7 +11,7 @@ import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
-import play.api.libs.json.{JsString, Json, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.json.{JsResultException, JsString, Json, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.Future
@@ -28,7 +28,7 @@ object ClusterRouter {
     type Row = Array[Int]
     type Matrix = Array[Row]
 
-    private val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
+    val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
         throw new Error("routing.server not defined in application.conf, routing will not work")
     )).withHeaders(
         "Content-Type" -> "application/json",
@@ -49,15 +49,15 @@ object ClusterRouter {
 
     object DistanceFinder {
 
-        private val googleMaps = WS.url("https://maps.googleapis.com/maps/api/distancematrix/json")
+        val googleMaps = WS.url("https://maps.googleapis.com/maps/api/distancematrix/json")
 
-        private def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] =
+        def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] =
             googleMaps.withQueryString(
                 "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
                 "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|")
             ).get()
 
-        private def parseResponse(res: WSResponse): Try[(Matrix,Matrix)] = Try(
+        def parseResponse(res: WSResponse): Try[(Matrix,Matrix)] = Try(
             res.json.validate(
                 (__ \ "rows").read[Array[JsValue]].map(
                     _.map(_.validate(
@@ -132,6 +132,28 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
     val matrixWriter: Writes[Matrix] = Writes.arrayWrites[Row]//Json.writes[Array[Array[Double]]]
 
+    def parseRoutingResponse(vehicles: Seq[Vehicle], commodities: Seq[Commodity], result: WSResponse) =
+        result.json.validate(
+            (__ \ "routes").read(
+                Reads.seq(Reads.seq(Reads.JsNumberReads.map(_.value.toInt))).map(routes =>
+                    routes.map { arr =>
+                        val routeBuilder = Route.newBuilder(vehicles(arr.head - 1 - 2 * commodities.size))
+                        arr.tail.foreach(
+                            i => if (i <= commodities.size) {
+                                routeBuilder += new PickUp(commodities(i - 1))
+                            } else {
+                                routeBuilder += new DropOff(commodities(i - commodities.size - 1))
+                            }
+                        )
+                        routeBuilder.result()
+                    }
+                )
+            )
+        ).fold(
+            t => Logger.error("Failed to parse response json", new JsResultException(t)),
+            publish
+        )
+
     private def recalculate(): Unit = {
         val cluster: Cluster = Cluster.Dao.read(clusterId).getOrElse{
             Logger.warn("Cluster with id: "+clusterId+" missing")
@@ -204,27 +226,12 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
             Logger.info("Sending message: "+body)
             routingServer.post(
                 body
-            ).onComplete{ result =>
-                val w = result.recover{
-                    case t : Throwable =>
-                        Logger.warn("Failed to read route response", t)
-                        return
-                }.get
-                w.json.validate(
-                    Reads.list(Reads.list(Reads.JsNumberReads.map(_.value.toInt))).map( routes =>
-                        publish(routes.map{ arr =>
-                            val routeBuilder = Route.newBuilder(vehicles(arr.head - 1 - 2 * commodities.size))
-                            arr.tail.foreach(
-                                i => if(i <= commodities.size){
-                                    routeBuilder += new PickUp(commodities(i - 1))
-                                } else {
-                                    routeBuilder += new DropOff(commodities(i - commodities.size - 1))
-                                }
-                            )
-                            routeBuilder.result()
-                        })
-                    )
-                )
+            ).recover { case t: Throwable =>
+                Logger.warn("Failed to read route response", t)
+                return
+            }.onSuccess{ case c =>
+                Logger.info("Received route response: " + c.body)
+                parseRoutingResponse(vehicles, commodities, c)
             }
             Logger.info("SENDING DATA")
         }).onFailure{case t => Logger.error("Failed to request and receive route data from google maps api", t)}
