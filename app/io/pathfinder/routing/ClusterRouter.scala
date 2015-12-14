@@ -177,8 +177,8 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                     )
                 ).map(row => JsArray(row.map(JsNumber(_)))))
 
-            val comTable = JsObject(commodities.indices.map(num => (num.toString,JsNumber(num+commodities.size))))
-            val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num+2*commodities.size)))
+            val comTable = JsObject(commodities.indices.map(num => ((num+1).toString,JsNumber(num+commodities.size+1))))
+            val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num+2*commodities.size+1)))
             val body = JsObject(Seq(
                 "commodities" -> comTable,
                 "vehicles" -> vehicleTable,
@@ -213,12 +213,12 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 w.json.validate(
                     Reads.list(Reads.list(Reads.JsNumberReads.map(_.value.toInt))).map( routes =>
                         publish(routes.map{ arr =>
-                            val routeBuilder = Route.newBuilder(vehicles(arr.head - 2 * commodities.size))
+                            val routeBuilder = Route.newBuilder(vehicles(arr.head - 1 - 2 * commodities.size))
                             arr.tail.foreach(
-                                i => if(i < commodities.size){
-                                    routeBuilder += new PickUp(commodities(i))
+                                i => if(i <= commodities.size){
+                                    routeBuilder += new PickUp(commodities(i - 1))
                                 } else {
-                                    routeBuilder += new DropOff(commodities(i - commodities.size))
+                                    routeBuilder += new DropOff(commodities(i - commodities.size - 1))
                                 }
                             )
                             routeBuilder.result()
