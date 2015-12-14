@@ -210,7 +210,7 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                         case (com, i) => (i+1).toString -> com.metadata.validate(capacityRead).get
                     } ++
                     vehicles.zipWithIndex.map{
-                      case (veh, i) => (i+1+2*commodities.size).toString -> veh.metadata.validate(capacityRead).get
+                      case (veh, i) => (i + 1 + 2 * commodities.size).toString -> veh.metadata.validate(capacityRead).get
                     }
                 )
             ))
