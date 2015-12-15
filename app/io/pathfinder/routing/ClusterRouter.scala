@@ -6,12 +6,12 @@ import com.avaje.ebean.Model
 import io.pathfinder.models.{Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
-import io.pathfinder.websockets.WebSocketMessage.Routed
+import io.pathfinder.websockets.WebSocketMessage.{Error, Routed}
 import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
-import play.api.libs.json.{JsSuccess, JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.json.{JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.Future
@@ -21,7 +21,7 @@ import scala.language.postfixOps
 
 import ClusterRouter._
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object ClusterRouter {
 
@@ -29,7 +29,7 @@ object ClusterRouter {
     type Matrix = Array[Row]
 
     val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
-        throw new Error("routing.server not defined in application.conf, routing will not work")
+        throw new scala.Error("routing.server not defined in application.conf, routing will not work")
     )).withHeaders(
         "Content-Type" -> "application/json",
         "Accept" -> "application/json"
@@ -76,13 +76,19 @@ object ClusterRouter {
         )
 
         def find(origins: Seq[(Double, Double)], dests: Seq[(Double, Double)]): Future[(Matrix,Matrix)] =
-            makeRequest(origins, dests).map(parseResponse).flatMap(
+            makeRequest(origins, dests).map{ resp =>
+                Logger.info(resp.body)
+                resp
+            }.map(parseResponse).flatMap(
                 _.recover{case t => return Future.failed(t)}.map(Future.successful).get
             )
     }
 }
 
 class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus with LookupClassification {
+
+    private var cachedRoutes: Option[Seq[Route]] = None
+
     override type Event = ((ModelTypes.Value, Long), Routed)
     override type Classifier = (ModelTypes.Value, Long) // subscribe by model and by id
 
@@ -97,13 +103,20 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
         super.subscribe(client, c)
     }
 
+    def clusterRouted(routes: Seq[Route]): Routed = Routed(
+        ModelTypes.Cluster,
+        JsObject(Seq(("id",JsNumber(clusterId)))),
+        Writes.seq(Route.writes).writes(routes)
+    )
+
+    def vehicleRouted(route: Route): Routed = Routed(
+        ModelTypes.Vehicle,
+        Vehicle.format.writes(route.vehicle),
+        Route.writes.writes(route)
+    )
+
     def publish(routes: Seq[Route]): Unit ={
-        val clusterRouted = Routed(
-            ModelTypes.Cluster,
-            JsObject(Seq(("id",JsNumber(clusterId)))),
-            Writes.seq(Route.writes).writes(routes)
-        )
-        publish(((ModelTypes.Cluster,clusterId), clusterRouted)) // send list of routes to cluster subscribers
+        publish(((ModelTypes.Cluster,clusterId), clusterRouted(routes))) // send list of routes to cluster subscribers
         routes.foreach { route =>
             val routeJson: JsValue = Route.writes.writes(route)
             val vehicleJson: JsValue = Vehicle.format.writes(route.vehicle)
@@ -125,14 +138,55 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
      * The cluster router just recalculates whenever a route request or update occurs
      */
     override def receive: Receive = {
-        case ClusterEvent(event , model) => recalculate()
-        case RouteRequest(client, model, id) => recalculate()
+        case ClusterEvent(event , model) => recalculate().map {
+            res =>
+                publish(res)
+                cachedRoutes = Some(res)
+        }
+        case RouteRequest(client, model, id) => cachedRoutes.map { routes =>
+            Logger.info("using cached routes")
+            Future.successful(routes)
+        }.getOrElse(
+            recalculate().map{ routes =>
+                cachedRoutes = Some(routes)
+                routes
+            }
+        ).recoverWith{
+            case t =>
+                client ! Error("Failed to route cluster: "+t.getMessage)
+                Future.failed(t)
+        }.foreach( routes =>
+            model match {
+                case ModelTypes.Cluster => client ! clusterRouted(routes)
+                case ModelTypes.Vehicle => routes.find(_.vehicle.id == id).foreach{ route =>
+                    client ! vehicleRouted(route)
+                }
+                case ModelTypes.Commodity =>
+                    var commodity: Commodity = null
+                    routes.find{ route =>
+                        route.actions.exists {
+                            case PickUp(lat, lng, com) =>
+                                if (com.id == id) {
+                                    commodity = com
+                                    true
+                                } else false
+                            case x => false
+                        }
+                    }.foreach{ route =>
+                        client ! Routed(
+                            ModelTypes.Commodity,
+                            Commodity.format.writes(commodity),
+                            Route.writes.writes(route)
+                        )
+                    }
+            }
+        )
         case _Else => super.receive(_Else)
     }
 
     val matrixWriter: Writes[Matrix] = Writes.arrayWrites[Row]//Json.writes[Array[Array[Double]]]
 
-    def parseRoutingResponse(vehicles: Seq[Vehicle], commodities: Seq[Commodity], result: WSResponse) =
+    def parseRoutingResponse(vehicles: Seq[Vehicle], commodities: Seq[Commodity], result: WSResponse): Try[Seq[Route]] =
         result.json.validate(
             (__ \ "routes").read(
                 Reads.seq(Reads.seq(Reads.JsNumberReads.map(_.value.toInt))).map(routes =>
@@ -150,33 +204,34 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 )
             )
         ).fold(
-            t => Logger.error("Failed to parse response json", new JsResultException(t)),
-            publish
+            { t => return Failure(JsResultException(t)) },
+                //Logger.error("Failed to parse response json", new JsResultException(ex)); return Failure(ex) },
+            routes => Success(routes)
         )
 
-    private def recalculate(): Unit = {
+    private def recalculate(): Future[Seq[Route]] = {
         val cluster: Cluster = Cluster.Dao.read(clusterId).getOrElse{
             Logger.warn("Cluster with id: "+clusterId+" missing")
-            return
+            return Future.failed(null)
         }
         Logger.info("RECALCULATING")
         val vehicles = cluster.descendants.map(_.vehicles).fold(cluster.vehicles)(_ ++ _)
         if (vehicles.size <= 0) {
             Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
-            return
+            return Future.failed(null)
         }
         Logger.info("GOT VEHICLES")
         val commodities = cluster.descendants.map(_.commodities).fold(cluster.commodities)(_ ++ _)
         if (commodities.size <= 0) {
             Logger.info("someone asked for Router to recalculate but there are no commodities in cluster")
-            return
+            return Future.failed(null)
         }
         Logger.info("GOT COMMODITIES")
 
         val starts = vehicles.map(x => (x.latitude, x.longitude))
         val pickups = commodities.map(c => (c.startLatitude, c.startLongitude))
         val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
-        (for {
+        val body: Future[JsValue] = for {
             (startToPickUpDist, startToPickUpDur) <- DistanceFinder.find(starts, pickups)
             (pickUpToDropOffDist, pickUpToDropOffDur) <- DistanceFinder.find(pickups, dropOffs)
             (pickUpToPickUpDist, pickUpToPickUpDur) <- DistanceFinder.find(pickups, pickups)
@@ -190,30 +245,30 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 dropOffsToPickUps: Matrix,
                 dropOffsToDropOffs: Matrix
             ) = JsArray((
-                    pickUpsToPickUps.zip(pickUpsToDropOffs).map(
-                        tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
-                    ) ++ dropOffsToPickUps.zip(dropOffsToDropOffs).map(
-                        tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
-                    ) ++ startsToPickUps.map(
-                        _ ++ Seq.fill(commodities.size)(0) ++ Seq.fill(vehicles.size)(0)
-                    )
-                ).map(row => JsArray(row.map(JsNumber(_)))))
+              pickUpsToPickUps.zip(pickUpsToDropOffs).map(
+                  tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
+              ) ++ dropOffsToPickUps.zip(dropOffsToDropOffs).map(
+                  tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
+              ) ++ startsToPickUps.map(
+                  _ ++ Seq.fill(commodities.size + vehicles.size)(0)
+              )).map(row => JsArray(row.map(JsNumber(_))))
+            )
 
-            val comTable = JsObject(commodities.indices.map(num => ((num+1).toString,JsNumber(num+commodities.size+1))))
-            val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num+2*commodities.size+1)))
+            val comTable = JsObject(commodities.indices.map(num => ((num + 1).toString, JsNumber(num + commodities.size + 1))))
+            val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num + 2 * commodities.size + 1)))
             val capacities = JsArray(Seq(JsObject(
-                commodities.zipWithIndex.map{
+                commodities.zipWithIndex.map {
                     case (com, i) =>
-                        (i+1).toString ->
-                            com.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(1))
+                        (i + 1).toString ->
+                          com.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(1))
                 } ++
-                vehicles.zipWithIndex.map{
-                    case (veh, i) =>
-                        (i+1+2*commodities.size).toString ->
+                  vehicles.zipWithIndex.map {
+                      case (veh, i) =>
+                          (i + 1 + 2 * commodities.size).toString ->
                             veh.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
-                }
+                  }
             )))
-            val body = JsObject(Seq(
+            JsObject(Seq(
                 "commodities" -> comTable,
                 "vehicles" -> vehicleTable,
                 "capacities" -> capacities,
@@ -235,17 +290,27 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 "commodityParameters" -> JsArray(),
                 "objective" -> JsString("0")
             ))
-            Logger.info("Sending message: "+body)
+        }
+        body.recoverWith[JsValue]{
+            case t =>
+                Logger.error("Failed to request and receive route data from google maps api", t)
+                Future.failed(t)
+        }.flatMap[WSResponse]{ json =>
+            Logger.info("Sending message: " + body)
             routingServer.post(
-                body
-            ).recover { case t: Throwable =>
-                Logger.warn("Failed to read route response", t)
-                return
-            }.onSuccess{ case c =>
-                Logger.info("Received route response: " + c.body)
-                parseRoutingResponse(vehicles, commodities, c)
+                json
+            ).map{ response =>
+               Logger.info("Received routing response: "+response.json)
+               response
+            }.recoverWith[WSResponse]{
+                case t =>
+                    Logger.warn("Failed to read route response", t)
+                    Future.failed(t)
             }
-            Logger.info("SENDING DATA")
-        }).onFailure{case t => Logger.error("Failed to request and receive route data from google maps api", t)}
+        }.flatMap[Seq[Route]]{ resp =>
+            parseRoutingResponse(vehicles, commodities, resp).map(Future.successful).recover{
+                case t => Future.failed(t)
+            }.get
+        }
     }
 }
