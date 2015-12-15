@@ -11,7 +11,7 @@ import io.pathfinder.websockets.pushing.EventBusActor
 import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
-import play.api.libs.json.{JsResultException, JsString, Json, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
+import play.api.libs.json.{JsSuccess, JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.Future
@@ -138,8 +138,8 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 Reads.seq(Reads.seq(Reads.JsNumberReads.map(_.value.toInt))).map(routes =>
                     routes.map { arr =>
                         val routeBuilder = Route.newBuilder(vehicles(arr.head - 1 - 2 * commodities.size))
-                        arr.tail.foreach(
-                            i => if (i <= commodities.size) {
+                        arr.tail.foreach( i =>
+                            if (i <= commodities.size) {
                                 routeBuilder += new PickUp(commodities(i - 1))
                             } else {
                                 routeBuilder += new DropOff(commodities(i - commodities.size - 1))
@@ -201,10 +201,22 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
             val comTable = JsObject(commodities.indices.map(num => ((num+1).toString,JsNumber(num+commodities.size+1))))
             val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num+2*commodities.size+1)))
+            val capacities = JsArray(Seq(JsObject(
+                commodities.zipWithIndex.map{
+                    case (com, i) =>
+                        (i+1).toString ->
+                            com.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(1))
+                } ++
+                vehicles.zipWithIndex.map{
+                    case (veh, i) =>
+                        (i+1+2*commodities.size).toString ->
+                            veh.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
+                }
+            )))
             val body = JsObject(Seq(
                 "commodities" -> comTable,
                 "vehicles" -> vehicleTable,
-                "capacities" -> JsArray(),
+                "capacities" -> capacities,
                 "distances" -> makeMatrix(
                     startToPickUpDist,
                     pickUpToDropOffDist,
