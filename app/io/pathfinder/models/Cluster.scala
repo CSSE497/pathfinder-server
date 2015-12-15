@@ -1,7 +1,7 @@
 package io.pathfinder.models
 
 import java.util
-import javax.persistence.{JoinColumn, ManyToOne, OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
+import javax.persistence.{OneToOne, JoinColumn, ManyToOne, OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
 
 import com.avaje.ebean.Model
 import io.pathfinder.data.{ObserverDao, Resource}
@@ -122,13 +122,18 @@ class Cluster() extends Model with HasId {
 
     def parents: Iterator[Cluster] =
         Iterator.iterate[Option[Cluster]](
-            Some(this)
+            this.parent
         )(
             _.flatMap(_.parent)
         ).takeWhile(_.isDefined).map(_.get)
 
     def descendants: Iterator[Cluster] =             // each level            // combine all the levels
         Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
+
+    def application: PathfinderApplication =
+        PathfinderApplication.finder.where().eq("cluster_id",
+            (Iterator(this) ++ parents).dropWhile(_.parent.isDefined).next().id
+        ).findUnique()
 
     override def toString = String.format(
         "Cluster(id: %s, vehicles: %s, commodities: %s)",
