@@ -50,12 +50,22 @@ object ClusterRouter {
     object DistanceFinder {
 
         val googleMaps = WS.url("https://maps.googleapis.com/maps/api/distancematrix/json")
+        val apiKey = Play.configuration.getString("google.key").orElse{
+            Logger.warn("No API key set in application.conf file")
+            None
+        }
 
         def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] =
-            googleMaps.withQueryString(
-                "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
-                "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|")
-            ).get()
+            apiKey.fold{
+                googleMaps.withQueryString(
+                    "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
+                    "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"))
+            } { key =>
+                googleMaps.withQueryString(
+                    "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
+                    "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
+                    "key" -> key)
+            }.get()
 
         def parseResponse(res: WSResponse): Try[(Matrix,Matrix)] = Try(
             res.json.validate(

@@ -32,7 +32,7 @@ routesGenerator := InjectedRoutesGenerator
 
 // Docker configuration
 packageName in Docker := "pathfinder-server"
-version in Docker := "0.3.2"
+version in Docker := "0.3.3"
 maintainer in Docker := "Pathfinder Team"
 dockerRepository := Some("beta.gcr.io/phonic-aquifer-105721")
 dockerExposedPorts := Seq(9000, 9443)
