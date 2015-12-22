@@ -2,6 +2,7 @@ package io.pathfinder.websockets
 
 import java.util.UUID
 import io.pathfinder.websockets.WebSocketMessage.MessageCompanion
+import play.Logger
 import play.api.libs.json.{Writes, Reads, JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.mvc.WebSocket.FrameFormatter
 import play.api.libs.functional.syntax._
@@ -23,15 +24,15 @@ object WebSocketMessage {
     import ModelTypes.{ModelType, format => modelFormat}
     import Events.{Event, format => eventFormat}
 
-    private val builder = Map.newBuilder[String, MessageCompanion[_]]
+    private val builder = Map.newBuilder[String, MessageCompanion[_ <: WebSocketMessage]]
 
     sealed abstract class MessageCompanion[M <: WebSocketMessage] {
         def message: String
 
         def format: Format[M]
-
-        builder += message -> this
     }
+
+    private def addComp(comp: MessageCompanion[_ <: WebSocketMessage]) = builder += comp.message -> comp
 
     /**
      * These messages are routed to controllers based on the model they contain
@@ -51,6 +52,7 @@ object WebSocketMessage {
         override val message = "Error"
         override val format = Json.format[Error]
     }
+    addComp(Error)
 
     case class UnknownMessage(value: JsValue) extends WebSocketMessage {
         override def companion = UnknownMessage
@@ -63,6 +65,7 @@ object WebSocketMessage {
             override def writes(o: UnknownMessage): JsValue = o.value
         }
     }
+    addComp(UnknownMessage)
 
     /**
      * Sent by the client to unsubscribe from push notifications
@@ -79,6 +82,7 @@ object WebSocketMessage {
         override val message = "Unsubscribe"
         override val format = Json.format[Unsubscribe]
     }
+    addComp(Unsubscribe)
 
     /**
      * Sent by the client to subscribe to push notifications
@@ -95,6 +99,7 @@ object WebSocketMessage {
         override val message = "Subscribe"
         override val format = Json.format[Subscribe]
     }
+    addComp(Subscribe)
 
     /**
      * Sent by the client to subscribe to route updates
@@ -110,6 +115,7 @@ object WebSocketMessage {
         override val message = "RouteSubscribe"
         override val format = Json.format[RouteSubscribe]
     }
+    addComp(RouteSubscribe)
 
     /**
      * Sent by the client to unsubscribe from route updates
@@ -125,6 +131,7 @@ object WebSocketMessage {
         override val message = "RouteUnsubscribe"
         override val format = Json.format[RouteUnsubscribe]
     }
+    addComp(RouteUnsubscribe)
 
     case class RouteSubscribed(
         model:     ModelType,
@@ -137,6 +144,7 @@ object WebSocketMessage {
         override val message = "RouteSubscribed"
         override val format = Json.format[RouteSubscribed]
     }
+    addComp(RouteSubscribed)
 
     /**
      * Sent by the client to create a new model
@@ -152,6 +160,7 @@ object WebSocketMessage {
         override val message = "Create"
         override val format = Json.format[Create]
     }
+    addComp(Create)
 
     /**
      * Sent by the client to update a model with the specified id
@@ -168,6 +177,7 @@ object WebSocketMessage {
         override val message = "Update"
         override val format = Json.format[Update]
     }
+    addComp(Update)
 
     /**
      * Sent by the client to delete the specified model
@@ -183,6 +193,7 @@ object WebSocketMessage {
         override val message = "Delete"
         override val format = Json.format[Delete]
     }
+    addComp(Delete)
 
     /**
      * Request for when the client wants a route for a vehicle or commodity
@@ -198,6 +209,7 @@ object WebSocketMessage {
         override val message = "Route"
         override val format = Json.format[Route]
     }
+    addComp(Route)
 
     /**
      * Response for a route request
@@ -214,6 +226,7 @@ object WebSocketMessage {
         override val message = "Routed"
         override val format = Json.format[Routed]
     }
+    addComp(Routed)
 
     /**
      * Sent by the client that wants to read a model from the database
@@ -229,6 +242,7 @@ object WebSocketMessage {
         override val message = "Read"
         override val format = Json.format[Read]
     }
+    addComp(Read)
 
     /**
      * Sent by the client that wants to get the clusters for an application
@@ -243,6 +257,7 @@ object WebSocketMessage {
         override val message = "GetApplicationCluster"
         override val format = Json.format[GetApplicationCluster]
     }
+    addComp(GetApplicationCluster)
 
     implicit val uuidFormat = Format[UUID](
         Reads.StringReads.map(UUID.fromString),
@@ -260,6 +275,7 @@ object WebSocketMessage {
         override val message = "ApplicationCluster"
         override val format = Json.format[ApplicationCluster]
     }
+    addComp(ApplicationCluster)
 
     /**
      * Message sent to the client that requested a create
@@ -275,6 +291,7 @@ object WebSocketMessage {
         override val message = "Created"
         override val format = Json.format[Created]
     }
+    addComp(Created)
 
     /**
      * Message sent to a client that requested an update
@@ -291,6 +308,8 @@ object WebSocketMessage {
         override val message = "Updated"
         override val format = Json.format[Updated]
     }
+    addComp(Updated)
+
 
     /**
      * Message sent to a client that requested a read
@@ -306,6 +325,7 @@ object WebSocketMessage {
         override val message = "Model"
         override val format = Json.format[Model]
     }
+    addComp(Model)
 
     /**
      * Message sent to a client that requested a delete
@@ -321,6 +341,7 @@ object WebSocketMessage {
         override val message = "Deleted"
         override val format = Json.format[Deleted]
     }
+    addComp(Deleted)
 
     /**
      * Message sent to a client that requested a subscribe
@@ -337,6 +358,7 @@ object WebSocketMessage {
         override val message = "Subscribed"
         override val format = Json.format[Subscribed]
     }
+    addComp(Subscribed)
 
     /**
      * Message sent to a client that requested to unsubscribe
@@ -353,9 +375,11 @@ object WebSocketMessage {
         override val message = "Unsubscribed"
         override val format = Json.format[Unsubscribed]
     }
+    addComp(Unsubscribed)
 
-    val stringToMessage = builder.result()
+    val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
 
+    Logger.info("stringToMessage: [" + stringToMessage.keys.mkString("|")+"]")
     /**
      * reads and writes WebSocketMessages from/to Json
      */
