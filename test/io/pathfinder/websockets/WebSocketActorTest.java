@@ -32,31 +32,30 @@ public class WebSocketActorTest extends BaseAppTest {
     private TestProbe client;
 
     private static final JsValue JSON_CREATE_CLUSTER =
-        Json.parse("{\"create\":{\"model\":\"Cluster\",\"value\":{}}}");
+        Json.parse("{\"message\":\"Create\",\"model\":\"Cluster\",\"value\":{}}");
     private static final JsValue JSON_CREATE_VEHICLE =
-        Json.parse("{\"create\":{" +
-                        "\"model\":\"Vehicle\"," +
-                        "\"value\":{" +
-                            "\"latitude\":0.1," +
-                            "\"longitude\":-12.3," +
-                            "\"clusterId\":1," +
-                            "\"metadata\":{\"capacity\":99}," +
-                            "\"status\":\"Online\"" +
-                        "}" +
+        Json.parse("{\"message\":\"Create\"," +
+                    "\"model\":\"Vehicle\"," +
+                    "\"value\":{" +
+                        "\"latitude\":0.1," +
+                        "\"longitude\":-12.3," +
+                        "\"clusterId\":1," +
+                        "\"metadata\":{\"capacity\":99}," +
+                        "\"status\":\"Online\"" +
                     "}}");
     private static final JsValue JSON_CREATE_COMMODITY =
-        Json.parse("{\"create\":{" +
-                        "\"model\":\"Commodity\"," +
-                        "\"value\":{\"startLatitude\":0.1," +
-                            "\"startLongitude\":-12.3," +
-                            "\"endLatitude\":99.4," +
-                            "\"endLongitude\":-3.5," +
-                            "\"clusterId\":1," +
-                            "\"metadata\":{\"param\":5}" +
-                        "}" +
+        Json.parse("{\"message\":\"Create\"," +
+                    "\"model\":\"Commodity\"," +
+                    "\"value\":{" +
+                        "\"startLatitude\":0.1," +
+                        "\"startLongitude\":-12.3," +
+                        "\"endLatitude\":99.4," +
+                        "\"endLongitude\":-3.5," +
+                        "\"clusterId\":1," +
+                        "\"metadata\":{\"param\":5}" +
                     "}}");
     private static final JsValue JSON_GET_CLUSTERS =
-        Json.parse("{\"getApplicationCluster\":{\"id\":\""+APPLICATION_ID+"\"}}");
+        Json.parse("{\"message\":\"getApplicationCluster\", \"id\":\""+APPLICATION_ID+"\"}");
 
     private static final int TIMEOUT = 3000;
 
