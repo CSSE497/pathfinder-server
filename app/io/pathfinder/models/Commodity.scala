@@ -32,7 +32,7 @@ object Commodity {
         endLongitude: Option[Double],
         status: Option[CommodityStatus],
         metadata:  Option[JsObject],
-        clusterId: Option[Long]
+        clusterPath: Option[String]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
             startLatitude.foreach(c.startLatitude  = _)
@@ -64,7 +64,7 @@ object Commodity {
             }
 
         override def create: Option[Commodity] = for {
-            id <- clusterId
+            id <- clusterPath
             cluster <- Cluster.Dao.read(id)
             model <- create(cluster)
         } yield model
