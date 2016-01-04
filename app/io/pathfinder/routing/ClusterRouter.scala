@@ -44,7 +44,7 @@ object ClusterRouter {
         case class ClusterEvent(event: Events.Value, model: Model) extends ClusterRouterMessage
 
         /*** For when a client requests to see a specific route **/
-        case class RouteRequest(client: ActorRef, modelType: ModelTypes.Value, id: Long) extends ClusterRouterMessage
+        case class RouteRequest(client: ActorRef, id: ModelId) extends ClusterRouterMessage
     }
 
     object DistanceFinder {
@@ -153,7 +153,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 publish(res)
                 cachedRoutes = Some(res)
         }
-        case RouteRequest(client, model, id) => cachedRoutes.map { routes =>
+        case RouteRequest(client, mId) => cachedRoutes.map { routes =>
             Logger.info("using cached routes")
             Future.successful(routes)
         }.getOrElse(
@@ -166,12 +166,12 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 client ! Error("Failed to route cluster: "+t.getMessage)
                 Future.failed(t)
         }.foreach( routes =>
-            model match {
-                case ModelTypes.Cluster => client ! clusterRouted(routes)
-                case ModelTypes.Vehicle => routes.find(_.vehicle.id == id).foreach{ route =>
+            mId match {
+                case ModelId.ClusterPath(path) => client ! clusterRouted(routes)
+                case ModelId.VehicleId(id) => routes.find(_.vehicle.id == id).foreach{ route =>
                     client ! vehicleRouted(route)
                 }
-                case ModelTypes.Commodity =>
+                case ModelId.CommodityId(id) =>
                     var commodity: Commodity = null
                     routes.find{ route =>
                         route.actions.exists {

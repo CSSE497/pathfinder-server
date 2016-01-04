@@ -44,7 +44,7 @@ object WebSocketMessage {
         override def model = id.modelType
     }
 
-    sealed abstract class SubscriptionMessage extends ControllerMessage {
+    sealed abstract class SubscriptionMessage extends WebSocketMessage {
         def clusterPath: Option[String]
         def model: Option[ModelType]
         def id: Option[ModelId]
@@ -72,7 +72,7 @@ object WebSocketMessage {
                 id.map(i => ModelId.read(model.getOrElse(ModelTypes.Cluster), i).get)
             )
         }, {
-            sub => (sub.clusterPath, sub.model, sub.id.map(ModelId.write))
+            sub: M => (sub.clusterPath, sub.model, sub.id.map(ModelId.write))
         }
     )
 
@@ -109,7 +109,7 @@ object WebSocketMessage {
         clusterPath: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
-    ) extends WebSocketMessage {
+    ) extends SubscriptionMessage {
         override def companion = Unsubscribe
     }
 
@@ -126,7 +126,7 @@ object WebSocketMessage {
         clusterPath: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
-    ) extends WebSocketMessage {
+    ) extends SubscriptionMessage {
         override def companion = Subscribe
     }
 
@@ -134,7 +134,6 @@ object WebSocketMessage {
         override val message = "Subscribe"
         override val format = subscriptionMessageFormat(Subscribe.apply)
     }
-
     addComp(Subscribe)
 
     /**
@@ -142,7 +141,7 @@ object WebSocketMessage {
      */
     case class RouteSubscribe(
         id: ModelId
-    ) extends WebSocketMessage {
+    ) extends ModelMessage {
         override def companion = RouteSubscribe
     }
 
@@ -157,7 +156,7 @@ object WebSocketMessage {
      */
     case class RouteUnsubscribe(
         id: ModelId
-    ) extends WebSocketMessage {
+    ) extends ModelMessage {
         override def companion = RouteUnsubscribe
     }
 
@@ -169,7 +168,7 @@ object WebSocketMessage {
 
     case class RouteSubscribed(
         id: ModelId
-    ) extends WebSocketMessage {
+    ) extends ModelMessage {
         override def companion = RouteSubscribed
     }
 
@@ -212,8 +211,8 @@ object WebSocketMessage {
             (__ \ "id").format[JsValue] and
             (__ \ "value").format[JsValue]
         }.apply[Update](
-            { (model, id, value) => Update(ModelId.read(model, id).get, value) },
-            { case Update(mId, value) => (mId.modelType, ModelId.write(mId), value) }
+            { (model: ModelType, id: JsValue, value: JsValue) => Update(ModelId.read(model, id).get, value) },
+            { u: Update => (u.id.modelType, ModelId.write(u.id), u.value) }
         )
     }
     addComp(Update)
@@ -380,7 +379,7 @@ object WebSocketMessage {
         clusterPath: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
-    ) extends WebSocketMessage {
+    ) extends SubscriptionMessage {
         override def companion = Subscribed
     }
 
@@ -397,7 +396,7 @@ object WebSocketMessage {
         clusterPath: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
-    ) extends WebSocketMessage {
+    ) extends SubscriptionMessage {
         override def companion = Unsubscribed
     }
 
