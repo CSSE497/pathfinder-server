@@ -2,7 +2,7 @@ package io.pathfinder.models
 
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.ModelTypes.ModelType
-import play.api.libs.json.{JsString, JsNumber, JsResult, JsValue, Writes, Json, Format}
+import play.api.libs.json.{Reads, JsString, JsNumber, JsResult, JsValue, Writes, Json, Format}
 
 object ModelId {
 
@@ -20,9 +20,9 @@ object ModelId {
 
     object CommodityId {
         val format: Format[CommodityId] = Format(
-            Json.reads[Long].map(CommodityId.apply),
+            Reads.JsNumberReads.map(num => CommodityId(num.value.longValue())),
             Writes {
-                case CommodityId(id) => Json.writes[Long].writes(id)
+                case CommodityId(id) => JsNumber(id)
             }
         )
     }
@@ -32,9 +32,9 @@ object ModelId {
 
     object ClusterPath {
         val format: Format[ClusterPath] = Format(
-            Json.reads[String].map(ClusterPath.apply),
+            Reads.JsStringReads.map(str => ClusterPath(str.value)),
             Writes {
-                case ClusterPath(path) => Json.writes[String].writes(path)
+                case ClusterPath(path) => JsString(path)
             }
         )
     }
@@ -44,9 +44,9 @@ object ModelId {
 
     object VehicleId {
         val format: Format[VehicleId] = Format(
-            Json.reads[Long].map(VehicleId.apply),
+            Reads.JsNumberReads.map(num => VehicleId.apply(num.value.toLong)),
             Writes {
-                case VehicleId(id) => Json.writes[Long].writes(id)
+                case VehicleId(id) => JsNumber(id)
             }
         )
     }

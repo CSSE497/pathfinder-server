@@ -54,8 +54,8 @@ object WebSocketMessage {
         (__ \ "model").format(ModelTypes.format) and
         (__ \ "id").format[JsValue]
     }.apply[M](
-        { (model, id) => makeMessage(ModelId.read(model, id).get) },
-        { mf => (mf.id.modelType, ModelId.write(mf.id)) }
+        { (model: ModelType, id: JsValue) => makeMessage(ModelId.read(model, id).get) },
+        { mf: M => (mf.id.modelType, ModelId.write(mf.id)) }
     )
 
     private def subscriptionMessageFormat[M <: SubscriptionMessage](
@@ -65,7 +65,7 @@ object WebSocketMessage {
             (__ \ "model").formatNullable(ModelTypes.format) and
             (__ \ "id").formatNullable[JsValue]
     }.apply[M](
-        { (path, model, id) =>
+        { (path: Option[String], model: Option[ModelType], id: Option[JsValue]) =>
             makeMessage(
                 path,
                 model,
