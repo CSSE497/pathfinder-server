@@ -55,7 +55,7 @@ public class WebSocketActorTest extends BaseAppTest {
                         "\"metadata\":{\"param\":5}" +
                     "}}");
     private static final JsValue JSON_GET_CLUSTERS =
-        Json.parse("{\"message\":\"getApplicationCluster\", \"id\":\""+APPLICATION_ID+"\"}");
+        Json.parse("{\"message\":\"GetApplicationCluster\", \"id\":\""+APPLICATION_ID+"\"}");
 
     private static final int TIMEOUT = 3000;
 
