@@ -32,6 +32,11 @@ object WebSocketMessage {
         def format: Format[M]
     }
 
+    implicit val uuidFormat = Format[UUID](
+        Reads.StringReads.map(UUID.fromString),
+        Writes(id => Writes.StringWrites.writes(id.toString))
+    )
+
     private def addComp(comp: MessageCompanion[_ <: WebSocketMessage]) = builder += comp.message -> comp
 
     /**
@@ -258,11 +263,6 @@ object WebSocketMessage {
         override val format = Json.format[GetApplicationCluster]
     }
     addComp(GetApplicationCluster)
-
-    implicit val uuidFormat = Format[UUID](
-        Reads.StringReads.map(UUID.fromString),
-        Writes(id => Writes.StringWrites.writes(id.toString))
-    )
 
     case class ApplicationCluster(
         id: UUID,

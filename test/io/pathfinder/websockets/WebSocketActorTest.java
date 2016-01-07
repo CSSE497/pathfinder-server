@@ -54,7 +54,7 @@ public class WebSocketActorTest extends BaseAppTest {
                         "\"clusterId\":1," +
                         "\"metadata\":{\"param\":5}" +
                     "}}");
-    private static final JsValue JSON_GET_CLUSTERS =
+    private static final JsValue JSON_GET_APPLICATION_CLUSTER =
         Json.parse("{\"message\":\"GetApplicationCluster\", \"id\":\""+APPLICATION_ID+"\"}");
 
     private static final int TIMEOUT = 3000;
@@ -111,8 +111,8 @@ public class WebSocketActorTest extends BaseAppTest {
     }
 
     @Test
-    public void testGetClusters() {
-        Patterns.ask(socket, WebSocketMessage.format().reads(JSON_GET_CLUSTERS).get(), TIMEOUT);
-        client.expectMsg(new WebSocketMessage.ApplicationCluster(APPLICATION_ID,1L));
+    public void testGetApplicationClusters() {
+        Patterns.ask(socket, WebSocketMessage.format().reads(JSON_GET_APPLICATION_CLUSTER).get(), TIMEOUT);
+        client.expectMsg(new WebSocketMessage.ApplicationCluster(APPLICATION_ID, 1L));
     }
 }

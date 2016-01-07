@@ -57,7 +57,7 @@ public class ClusterTest {
 
     @Before
     public void setup() {
-        fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase("default"));
+        fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase());
     }
 
     @After
