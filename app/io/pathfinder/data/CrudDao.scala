@@ -1,6 +1,6 @@
 package io.pathfinder.data
 
-trait CrudDao[K,M] {
+abstract class CrudDao[K,M] {
 
     /**
      * Adds the specified model to the database

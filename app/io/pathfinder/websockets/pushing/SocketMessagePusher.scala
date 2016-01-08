@@ -5,14 +5,14 @@ import akka.event.{LookupClassification, ActorEventBus}
 import play.Logger
 
 object SocketMessagePusher {
-    def props[K]: Props = Props(classOf[SocketMessagePusher[K]])
+    def props: Props = Props(classOf[SocketMessagePusher])
 }
 
-class SocketMessagePusher[K] extends EventBusActor with ActorEventBus with LookupClassification {
+class SocketMessagePusher extends EventBusActor with ActorEventBus with LookupClassification {
 
-    override type Event = (K, Any) // id and message
+    override type Event = (String, Any) // id and message
 
-    override type Classifier = K // cluster id
+    override type Classifier = String // cluster id
 
     override protected def classify(event: Event): Classifier = event._1
 

@@ -9,12 +9,5 @@ import scala.collection.JavaConversions.asScalaBuffer
 /**
  * manages vehicle API calls
  */
-object VehicleSocketController extends WebSocketCrudController[Vehicle](ModelTypes.Vehicle,Vehicle.Dao) {
+object VehicleSocketController extends WebSocketCrudController[Long, Vehicle](ModelTypes.Vehicle,Vehicle.Dao)
 
-    override def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage] = webSocketMessage match {
-        case RouteMsg(t,id) => Vehicle.Dao.read(id).map{
-                v => Error("Not implemented")
-            }.orElse(Some(WebSocketMessage.Error("No Vehicle with id: "+id)))
-        case x: WebSocketMessage => super.receive(x)
-    }
-}

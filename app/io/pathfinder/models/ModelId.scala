@@ -6,6 +6,14 @@ import play.api.libs.json.{Reads, JsString, JsNumber, JsResult, JsValue, Writes,
 
 object ModelId {
 
+    sealed abstract class LongId extends ModelId {
+        override type Key = Long
+    }
+
+    sealed abstract class StringId extends ModelId {
+        override type Key = String
+    }
+
     def read(model: ModelType, jsonId: JsValue): JsResult[ModelId] = model match {
         case ModelTypes.Commodity => CommodityId.format.reads(jsonId)
         case ModelTypes.Cluster => ClusterPath.format.reads(jsonId)
@@ -26,7 +34,7 @@ object ModelId {
             }
         )
     }
-    case class CommodityId(id: Long) extends ModelId {
+    case class CommodityId(id: Long) extends LongId {
         override def modelType = ModelTypes.Commodity
     }
 
@@ -38,8 +46,9 @@ object ModelId {
             }
         )
     }
-    case class ClusterPath(path: String) extends ModelId {
+    case class ClusterPath(path: String) extends StringId {
         override def modelType = ModelTypes.Cluster
+        override def id = path
     }
 
     object VehicleId {
@@ -50,11 +59,13 @@ object ModelId {
             }
         )
     }
-    case class VehicleId(id: Long) extends ModelId {
+    case class VehicleId(id: Long) extends LongId {
         override def modelType = ModelTypes.Vehicle
     }
 }
 
 sealed abstract class ModelId {
+    type Key
     def modelType: ModelType
+    def id: Key
 }

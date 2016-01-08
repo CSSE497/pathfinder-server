@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import com.avaje.ebean.Model.Find
 import io.pathfinder.config.Global
 import io.pathfinder.data.{CrudDao, EbeanCrudDao, ObserverDao}
+import io.pathfinder.models.ModelId.ClusterPath
 import io.pathfinder.models.{HasId, HasCluster}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.WebSocketMessage.{Updated, Deleted, Created}
@@ -24,15 +25,15 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
 
     def writer: Writes[V]
 
-    val byIdPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props[Long])
+    val byIdPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props)
 
-    val byClusterPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props[Long])
+    val byClusterPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props)
 
     protected def onCreated(model: V): Unit = {
         Logger.info("Adding model to create channel: " + model)
         val msg = Created(modelType, writer.writes(model))
         val id = model.id
-        val clusterId = model.cluster.id
+        val clusterId = model.cluster.path
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
         Router.publish(Events.Created, model)
@@ -42,7 +43,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         Logger.info("Adding model to create channel: " + model)
         val msg = Deleted(modelType, writer.writes(model))
         val id = model.id
-        val clusterId = model.cluster.id
+        val clusterId = model.cluster.path
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
         Router.publish(Events.Deleted, model)
@@ -52,13 +53,13 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         Logger.info("Adding model to create channel: "+model)
         val msg = Updated(modelType, writer.writes(model))
         val id = model.id
-        val clusterId = model.cluster.id
+        val clusterId = model.cluster.path
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
         Router.publish(Events.Updated, model)
     }
 
-    def subscribeByClusterId(clusterId: Long, client: ActorRef): Unit = {
+    override def subscribeByClusterPath(clusterId: String, client: ActorRef): Unit = {
         byClusterPusher ! Subscribe(client, clusterId)
     }
 
@@ -70,7 +71,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         byIdPusher ! Unsubscribe(client, id)
     }
 
-    def unsubscribeByClusterId(clusterId: Long, client: ActorRef): Unit = {
+    override def unsubscribeByClusterPath(clusterId: String, client: ActorRef): Unit = {
         byClusterPusher ! Unsubscribe(client, clusterId)
     }
 

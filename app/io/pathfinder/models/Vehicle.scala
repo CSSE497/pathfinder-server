@@ -27,7 +27,7 @@ object Vehicle {
         id:        Option[Long],
         latitude:  Option[Double],
         longitude: Option[Double],
-        clusterId: Option[Long],
+        clusterId: Option[String],
         status:    Option[VehicleStatus],
         metadata:  Option[JsObject]
     ) extends Resource[Vehicle] {
