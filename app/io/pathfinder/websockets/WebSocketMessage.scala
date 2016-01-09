@@ -1,6 +1,5 @@
 package io.pathfinder.websockets
 
-import java.util.UUID
 import io.pathfinder.websockets.WebSocketMessage.MessageCompanion
 import play.Logger
 import play.api.libs.json.{Writes, Reads, JsSuccess, JsResult, Format, Json, JsValue, __}
@@ -31,11 +30,6 @@ object WebSocketMessage {
 
         def format: Format[M]
     }
-
-    implicit val uuidFormat = Format[UUID](
-        Reads.StringReads.map(UUID.fromString),
-        Writes(id => Writes.StringWrites.writes(id.toString))
-    )
 
     private def addComp(comp: MessageCompanion[_ <: WebSocketMessage]) = builder += comp.message -> comp
 
@@ -253,7 +247,7 @@ object WebSocketMessage {
      * Sent by the client that wants to get the clusters for an application
      */
     case class GetApplicationCluster(
-        id: UUID
+        id: String
     ) extends WebSocketMessage {
         override def companion = GetApplicationCluster
     }
@@ -265,7 +259,7 @@ object WebSocketMessage {
     addComp(GetApplicationCluster)
 
     case class ApplicationCluster(
-        id: UUID,
+        id: String,
         clusterId: Long
     ) extends WebSocketMessage {
         override def companion = ApplicationCluster

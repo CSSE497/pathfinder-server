@@ -1,7 +1,8 @@
 package io.pathfinder.models
 
-import java.util.UUID
-import javax.persistence.{ManyToOne, JoinColumn, Column, Id, Entity}
+import java.util
+import javax.persistence.CascadeType._
+import javax.persistence._
 import com.avaje.ebean.Model
 import com.avaje.ebean.Model.{Finder, Find}
 import play.api.libs.json.{Json, Format}
@@ -9,21 +10,20 @@ import play.api.libs.json.{Json, Format}
 
 
 object Application {
-    val finder: Find[UUID, Application] =
-        new Finder[UUID, Application](classOf[Application])
+    val finder: Find[String, Application] =
+        new Finder[String, Application](classOf[Application])
 
     val format: Format[Application] = Json.format[Application]
 
-    def apply(id: UUID, name: String, token: Array[Byte], defaultClusterId: Long): Application = {
+    def apply(id: String, name: String, defaultClusterId: Long): Application = {
         val app = new Application
         app.id = id
-        app.token = token
         app.cluster = Cluster.Dao.read(defaultClusterId).get
         app
     }
 
-    def unapply(p: Application): Option[(UUID, String, Array[Byte], Long)] =
-        Some((p.id, p.name, p.token, Option(p.cluster).map(_.id).getOrElse(0L)))
+    def unapply(p: Application): Option[(String, String, Long)] =
+        Some((p.id, p.name, Option(p.cluster).map(_.id).getOrElse(0L)))
 }
 
 @Entity
@@ -31,13 +31,22 @@ class Application extends Model {
 
     @Id
     @Column(updatable = false)
-    var id: UUID = null
+    var id: String = null
 
     @Column
     var name: String = null
 
-    @Column
-    var token: Array[Byte] = "SECRET TOKEN".getBytes
+    @ManyToOne
+    var customer: Customer = null
+
+    @OneToMany(mappedBy = "application", cascade = Array(ALL))
+    var capacityParametersList: util.List[CapacityParameter] = new util.ArrayList[CapacityParameter]()
+
+    @OneToMany(mappedBy = "application", cascade = Array(ALL))
+    var objectiveParametersList: util.List[ObjectiveParameter] = new util.ArrayList[ObjectiveParameter]()
+
+    @ManyToOne
+    var objectiveFunction: ObjectiveFunction = null
 
     @ManyToOne
     @JoinColumn
