@@ -6,10 +6,11 @@ import java.util.UUID
 import javax.persistence.{OneToMany, CascadeType, Id, Column, Entity}
 
 import com.avaje.ebean.Model
+import com.avaje.ebean.annotation.Transactional
 import io.pathfinder.data.{EbeanCrudDao, Resource}
 import play.api.libs.json.{Json, Format}
 import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListConverter}
-import scala.collection.Iterator
+import scala.collection.{mutable, Iterator}
 
 object Cluster {
     val finder: Model.Find[String, Cluster] = new Model.Finder[String, Cluster](classOf[Cluster])
@@ -23,9 +24,11 @@ object Cluster {
     implicit val resourceFormat: Format[ClusterResource] = Json.format[ClusterResource]
 
     case class ClusterResource(
-        path: String,
+        path: Option[String],
+        name: Option[String],
         vehicles: Option[Seq[Vehicle.VehicleResource]],
-        commodities: Option[Seq[Commodity.CommodityResource]]
+        commodities: Option[Seq[Commodity.CommodityResource]],
+        subClusters: Option[Seq[ClusterResource]]
     ) extends Resource[Cluster] {
 
         override def update(model: Cluster): Option[Cluster] = None // Cluster Updates are not supported
@@ -33,7 +36,7 @@ object Cluster {
         /** Creates a new model instance from this resource. */
         override def create: Option[Cluster] = {
             val model = new Cluster
-            model.path = path // should validate path
+            model.path = path.getOrElse(return None) // should validate path
             vehicles.foreach(
                 _.foreach {
                     vehicleResource => model.vehicleList.add(
@@ -56,6 +59,12 @@ object Cluster {
                     )
                 }
             )
+            subClusters.foreach(
+                _.foreach(
+                    sub =>
+                        sub.copy(path = sub.path.orElse(Some(path + "/" + sub.name.getOrElse(return None))))
+                )
+            )
             Some(model)
         }
     }
@@ -65,6 +74,7 @@ object Cluster {
         c.path = path
         c.vehicleList.addAll(vehicles.asJava)
         c.commodityList.addAll(commodities.asJava)
+        c.unsavedSubclusters ++= subClusters
         c
     }
 
@@ -94,6 +104,8 @@ class Cluster() extends Model {
 
     def subClusters: Seq[Cluster] = Cluster.byPrefix(path+"/")
 
+    private val unsavedSubclusters: mutable.Buffer[Cluster] = mutable.Buffer.empty
+
     def parent: Option[Cluster] = Option(Cluster.finder.byId(path.substring(0,path.lastIndexOf("/"))))
 
     def parents: Iterator[Cluster] =
@@ -113,6 +125,33 @@ class Cluster() extends Model {
 
     def application: PathfinderApplication =
         PathfinderApplication.finder.byId(UUID.fromString(path.iterator.takeWhile(_ != '/').mkString))
+
+    @Transactional
+    override def delete(): Boolean = {
+        Cluster.byPrefix(path + "/").foreach(_.delete())
+        super.delete()
+    }
+
+    @Transactional
+    override def insert(): Unit = {
+        unsavedSubclusters.foreach(_.insert())
+        unsavedSubclusters.clear()
+        super.insert()
+    }
+
+    @Transactional
+    override def update(): Unit = {
+        unsavedSubclusters.foreach(_.update())
+        unsavedSubclusters.clear()
+        super.update()
+    }
+
+    @Transactional
+    override def save(): Unit = {
+        unsavedSubclusters.foreach(_.save())
+        unsavedSubclusters.clear()
+        super.save()
+    }
 
     override def toString = String.format(
         "Cluster(path: %s, vehicles: %s, commodities: %s)",
