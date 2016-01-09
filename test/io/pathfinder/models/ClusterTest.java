@@ -102,16 +102,21 @@ public class ClusterTest {
         vehicle2.save();
         vehicle3.save();
 
-        Cluster cluster4 = Cluster.apply(id_count++, newList(), newList(), newList());
+
+        Cluster cluster4 = Cluster.apply("main/cluster4", newList(), newList(), newList());
         cluster4.save();
-        Cluster cluster3 = Cluster.apply(id_count++, newList(), newList(), newList());
+        Cluster cluster3 = Cluster.apply("main/cluster3", newList(), newList(), newList());
         cluster3.save();
-        Cluster cluster2 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle3.id())), wrap(Arrays.asList(commodity3.id())), newList());
+        Cluster cluster2 = Cluster.apply("main/cluster2", wrap(Arrays.asList(vehicle3)), wrap(Arrays.asList
+                (commodity1, commodity3)), newList());
         cluster2.save();
-        Cluster cluster1 = Cluster.apply(id_count++, wrap(Arrays.asList(vehicle2.id())), wrap(Arrays.asList(commodity2.id())), newList());
+        Cluster cluster1 = Cluster.apply("main/cluster1", wrap(Arrays.asList(vehicle2)), wrap(Arrays.asList
+                (commodity2)), newList());
         cluster1.save();
-        Cluster mainCluster = Cluster.apply(id_count++, newList(), newList(), wrap(Arrays.asList(cluster1,cluster2,cluster3,cluster4)));
+        Cluster mainCluster = Cluster.apply("main", newList(), newList(), wrap(Arrays.asList(cluster1, cluster2, cluster3,
+                cluster4)));
         mainCluster.save();
+        mainCluster.refresh();
         return mainCluster;
     }
 
@@ -127,7 +132,7 @@ public class ClusterTest {
     public void validPostShouldCreateClusterEasy() {
         Helpers.running(fakeApp, () -> {
             ObjectNode body = jsonNodeFactory.objectNode();
-
+            body.put("path", "main/subcluster");
             RequestBuilder request = new RequestBuilder()
                     .bodyJson(body)
                     .header("Content-Type", "application/json")
@@ -142,7 +147,7 @@ public class ClusterTest {
             ObjectNode resultJson = (ObjectNode) bodyForResult(result);
 
             // Ensure that all fields were correctly written to the database
-            assertTrue("db record should have id", resultJson.hasNonNull("id"));
+            assertTrue("db record should have path", resultJson.hasNonNull("path"));
 
         });
     }
@@ -152,8 +157,8 @@ public class ClusterTest {
         Helpers.running(fakeApp, () -> {
 
             Cluster mainCluster = createClusters();
-            JsonNode jsonCluster = Json.toJson(mainCluster);
-
+            mainCluster.delete();
+            JsValue jsonCluster = Cluster.format().writes(mainCluster);
             RequestBuilder request = new RequestBuilder()
                     .bodyJson(jsonCluster)
                     .header("Content-Type", "application/json")
@@ -190,11 +195,11 @@ public class ClusterTest {
     @Test
     public void getByExistingIDShouldReturnCluster() {
         Helpers.running(fakeApp, () -> {
-            long existingId = createClusters().id();
+            String existingId = createClusters().path();
 
             RequestBuilder request = new RequestBuilder()
                     .method(Helpers.GET)
-                    .uri("/cluster/"+String.valueOf(existingId));
+                    .uri("/cluster/"+existingId);
             Result result = Helpers.route(request);
 
             assertEquals("Get cluster by id should return status 200", 200, result.status());
@@ -221,18 +226,18 @@ public class ClusterTest {
     @Test
     public void deleteShouldDeleteCluster() {
         Helpers.running(fakeApp, () -> {
-            long existingId = createClusters().id();
+            String existingId = createClusters().path();
 
             RequestBuilder deleteRequest = new RequestBuilder()
                     .method(Helpers.DELETE)
-                    .uri("/cluster/" + String.valueOf(existingId));
+                    .uri("/cluster/" + existingId);
             Result deleteResult = Helpers.route(deleteRequest);
 
             assertEquals("valid DELETE cluster request should return status 200", 200, deleteResult.status());
 
             RequestBuilder getRequest = new RequestBuilder()
                     .method(Helpers.GET)
-                    .uri("/cluster/" + String.valueOf(existingId));
+                    .uri("/cluster/" + existingId);
             Result getResult = Helpers.route(getRequest);
 
             assertEquals("GET req for deleted cluster should 404", 404, getResult.status());

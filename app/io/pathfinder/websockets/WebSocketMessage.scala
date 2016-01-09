@@ -297,6 +297,7 @@ object WebSocketMessage {
 
     case class ApplicationCluster(
         id: String,
+        value: JsValue
     ) extends WebSocketMessage {
         override def companion = ApplicationCluster
     }
