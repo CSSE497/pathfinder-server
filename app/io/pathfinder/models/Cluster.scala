@@ -130,8 +130,8 @@ class Cluster() extends Model with HasId {
     def descendants: Iterator[Cluster] =             // each level            // combine all the levels
         Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
 
-    def application: PathfinderApplication =
-        PathfinderApplication.finder.where().eq("cluster_id",
+    def application: Application =
+        Application.finder.where().eq("cluster_id",
             (Iterator(this) ++ parents).dropWhile(_.parent.isDefined).next().id
         ).findUnique()
 
