@@ -119,12 +119,7 @@ class Cluster() extends Model {
         Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
 
     def application: Application =
-        Application.finder.where().eq("cluster_id",
-            (Iterator(this) ++ parents).dropWhile(_.parent.isDefined).next().id
-        ).findUnique()
-
-    def application: PathfinderApplication =
-        PathfinderApplication.finder.byId(UUID.fromString(path.iterator.takeWhile(_ != '/').mkString))
+        Application.finder.byId(path.iterator.takeWhile(_ != '/').mkString)
 
     @Transactional
     override def delete(): Boolean = {

@@ -10,22 +10,20 @@ import play.api.libs.json.{Json, Format}
 import scala.collection.mutable
 import scala.collection.JavaConverters.asScalaBufferConverter
 
-
 object Application {
     val finder: Find[String, Application] =
         new Finder[String, Application](classOf[Application])
 
     val format: Format[Application] = Json.format[Application]
 
-    def apply(id: String, name: String, defaultClusterId: Long): Application = {
+    def apply(id: String, name: String): Application = {
         val app = new Application
         app.id = id
-        app.cluster = Cluster.Dao.read(defaultClusterId).get
         app
     }
 
-    def unapply(p: Application): Option[(String, String, Long)] =
-        Some((p.id, p.name, Option(p.cluster).map(_.id).getOrElse(0L)))
+    def unapply(p: Application): Option[(String, String)] =
+        Some((p.id, p.name))
 }
 
 @Entity
@@ -51,7 +49,7 @@ class Application extends Model {
     var objectiveFunction: ObjectiveFunction = null
 
     @ManyToOne
-    @JoinColumn
+    @PrimaryKeyJoinColumn(name = "id", referencedColumnName = "id")
     var cluster: Cluster = null
 
     def capacityParameters: mutable.Buffer[CapacityParameter] = capacityParametersList.asScala

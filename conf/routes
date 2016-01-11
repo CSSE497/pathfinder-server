@@ -19,5 +19,3 @@ GET           /cluster              io.pathfinder.controllers.ClusterController.
 GET           /cluster/:id          io.pathfinder.controllers.ClusterController.get(id: String)
 POST          /cluster              io.pathfinder.controllers.ClusterController.post
 DELETE        /cluster/:id          io.pathfinder.controllers.ClusterController.delete(id: String)
-
-GET           /application/:id      io.pathfinder.controllers.PathfinderApplicationController.get(id: java.util.UUID)
