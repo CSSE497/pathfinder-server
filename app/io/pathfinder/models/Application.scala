@@ -7,6 +7,8 @@ import com.avaje.ebean.Model
 import com.avaje.ebean.Model.{Finder, Find}
 import play.api.libs.json.{Json, Format}
 
+import scala.collection.mutable
+import scala.collection.JavaConverters.asScalaBufferConverter
 
 
 object Application {
@@ -51,4 +53,7 @@ class Application extends Model {
     @ManyToOne
     @JoinColumn
     var cluster: Cluster = null
+
+    def capacityParameters: mutable.Buffer[CapacityParameter] = capacityParametersList.asScala
+    def objectiveParameters: mutable.Buffer[ObjectiveParameter] = objectiveParametersList.asScala
 }
