@@ -266,18 +266,36 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
             val comTable = JsObject(commodities.indices.map(num => ((num + 1).toString, JsNumber(num + commodities.size + 1))))
             val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num + 2 * commodities.size + 1)))
-            val capacities = JsArray(Seq(JsObject(
-                commodities.zipWithIndex.map {
-                    case (com, i) =>
-                        (i + 1).toString ->
-                          com.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(1))
-                } ++
-                  vehicles.zipWithIndex.map {
-                      case (veh, i) =>
-                          (i + 1 + 2 * commodities.size).toString ->
-                            veh.metadata.validate((__ \ "capacity").read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
-                  }
-            )))
+            val capacities = JsObject(cluster.application.capacityParameters.map { p =>
+                p.parameter -> JsObject(
+                    commodities.zipWithIndex.map {
+                        case (com, i) =>
+                            (i + 1).toString ->
+                                com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
+                    } ++
+                    vehicles.zipWithIndex.map {
+                        case (veh, i) =>
+                            (i + 1 + 2 * commodities.size).toString ->
+                                veh.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
+                    }
+                )
+            })
+            Logger.info("Capacities: " + capacities)
+            val parameters = JsObject(cluster.application.objectiveParameters.map { p =>
+                p.parameter -> JsObject(
+                    commodities.zipWithIndex.map {
+                        case (com, i) =>
+                            (i + 1).toString ->
+                                com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
+                    } ++
+                    vehicles.zipWithIndex.map {
+                        case (veh, i) =>
+                            (i + 1 + 2 * commodities.size).toString ->
+                                veh.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
+                    }
+                )
+            })
+            Logger.info("Parameters: " + parameters)
             JsObject(Seq(
                 "commodities" -> comTable,
                 "vehicles" -> vehicleTable,
@@ -296,9 +314,8 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                     dropOffToPickUpDur,
                     dropOffToDropOffDur
                 ),
-                "vehicleParameters" -> JsArray(),
-                "commodityParameters" -> JsArray(),
-                "objective" -> JsString("0")
+                "parameters" -> parameters,
+                "objective" -> JsString(cluster.application.objectiveFunction.function)
             ))
         }
         body.recoverWith[JsValue]{
