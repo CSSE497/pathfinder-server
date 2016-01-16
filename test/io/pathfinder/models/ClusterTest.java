@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import play.api.libs.json.JsNumber;
 import play.api.libs.json.JsObject;
 import play.api.libs.json.JsValue;
-import play.libs.Json;
 import play.mvc.Result;
 import play.test.Helpers;
 import play.mvc.Http.RequestBuilder;
@@ -132,7 +131,7 @@ public class ClusterTest {
     public void validPostShouldCreateClusterEasy() {
         Helpers.running(fakeApp, () -> {
             ObjectNode body = jsonNodeFactory.objectNode();
-            body.put("path", "main/subcluster");
+            body.put("id", "main/subcluster");
             RequestBuilder request = new RequestBuilder()
                     .bodyJson(body)
                     .header("Content-Type", "application/json")
@@ -147,7 +146,7 @@ public class ClusterTest {
             ObjectNode resultJson = (ObjectNode) bodyForResult(result);
 
             // Ensure that all fields were correctly written to the database
-            assertTrue("db record should have path", resultJson.hasNonNull("path"));
+            assertTrue("db record should have id", resultJson.hasNonNull("id"));
 
         });
     }
@@ -195,7 +194,7 @@ public class ClusterTest {
     @Test
     public void getByExistingIDShouldReturnCluster() {
         Helpers.running(fakeApp, () -> {
-            String existingId = createClusters().path();
+            String existingId = createClusters().id();
 
             RequestBuilder request = new RequestBuilder()
                     .method(Helpers.GET)
@@ -226,7 +225,7 @@ public class ClusterTest {
     @Test
     public void deleteShouldDeleteCluster() {
         Helpers.running(fakeApp, () -> {
-            String existingId = createClusters().path();
+            String existingId = createClusters().id();
 
             RequestBuilder deleteRequest = new RequestBuilder()
                     .method(Helpers.DELETE)

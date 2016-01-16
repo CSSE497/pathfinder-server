@@ -33,7 +33,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         Logger.info("Adding model to create channel: " + model)
         val msg = Created(modelType, writer.writes(model))
         val id = model.id
-        val clusterId = model.cluster.path
+        val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
         Router.publish(Events.Created, model)
@@ -43,7 +43,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         Logger.info("Adding model to create channel: " + model)
         val msg = Deleted(modelType, writer.writes(model))
         val id = model.id
-        val clusterId = model.cluster.path
+        val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
         Router.publish(Events.Deleted, model)
@@ -53,7 +53,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
         Logger.info("Adding model to create channel: "+model)
         val msg = Updated(modelType, writer.writes(model))
         val id = model.id
-        val clusterId = model.cluster.path
+        val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
         byClusterPusher ! Publish((clusterId, msg))
         Router.publish(Events.Updated, model)
