@@ -48,9 +48,9 @@ class Application extends Model {
     @ManyToOne
     var objectiveFunction: ObjectiveFunction = null
 
-    @ManyToOne
-    @PrimaryKeyJoinColumn(name = "id", referencedColumnName = "id")
-    var cluster: Cluster = null
+    def cluster: Cluster = {
+        Cluster.finder.byId(id)
+    }
 
     def capacityParameters: mutable.Buffer[CapacityParameter] = capacityParametersList.asScala
     def objectiveParameters: mutable.Buffer[ObjectiveParameter] = objectiveParametersList.asScala

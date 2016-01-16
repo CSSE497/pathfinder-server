@@ -36,6 +36,8 @@ object ClusterRouter {
     )
 
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.path))
+    def props(clusterPath: String): Props = Props(new ClusterRouter(clusterPath))
+
     abstract sealed class ClusterRouterMessage
 
     object ClusterRouterMessage {

@@ -1,8 +1,6 @@
 package io.pathfinder.models
 
-import java.nio.charset.StandardCharsets
 import java.util
-import java.util.UUID
 import javax.persistence.{Transient, OneToMany, CascadeType, Id, Column, Entity}
 
 import com.avaje.ebean.Model
