@@ -3,7 +3,7 @@ package io.pathfinder.routing
 import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import com.avaje.ebean.Model
-import io.pathfinder.models.{Commodity, Vehicle, Cluster}
+import io.pathfinder.models.{ModelId, Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.WebSocketMessage.{Error, Routed}
@@ -35,7 +35,7 @@ object ClusterRouter {
         "Accept" -> "application/json"
     )
 
-    def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
+    def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.path))
     abstract sealed class ClusterRouterMessage
 
     object ClusterRouterMessage {
@@ -44,7 +44,7 @@ object ClusterRouter {
         case class ClusterEvent(event: Events.Value, model: Model) extends ClusterRouterMessage
 
         /*** For when a client requests to see a specific route **/
-        case class RouteRequest(client: ActorRef, modelType: ModelTypes.Value, id: Long) extends ClusterRouterMessage
+        case class RouteRequest(client: ActorRef, id: ModelId) extends ClusterRouterMessage
     }
 
     object DistanceFinder {
@@ -95,12 +95,12 @@ object ClusterRouter {
     }
 }
 
-class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus with LookupClassification {
+class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBus with LookupClassification {
 
     private var cachedRoutes: Option[Seq[Route]] = None
 
-    override type Event = ((ModelTypes.Value, Long), Routed)
-    override type Classifier = (ModelTypes.Value, Long) // subscribe by model and by id
+    override type Event = (ModelId, Routed)
+    override type Classifier = ModelId // subscribe by model and by id
 
     override protected def classify(event: Event): Classifier = event._1
 
@@ -115,7 +115,7 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
 
     def clusterRouted(routes: Seq[Route]): Routed = Routed(
         ModelTypes.Cluster,
-        JsObject(Seq(("id",JsNumber(clusterId)))),
+        JsObject(Seq(("path",JsString(clusterPath)))),
         Writes.seq(Route.writes).writes(routes)
     )
 
@@ -126,17 +126,17 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
     )
 
     def publish(routes: Seq[Route]): Unit ={
-        publish(((ModelTypes.Cluster,clusterId), clusterRouted(routes))) // send list of routes to cluster subscribers
+        publish((ModelId.ClusterPath(clusterPath), clusterRouted(routes))) // send list of routes to cluster subscribers
         routes.foreach { route =>
             val routeJson: JsValue = Route.writes.writes(route)
             val vehicleJson: JsValue = Vehicle.format.writes(route.vehicle)
 
             // publish vehicles to vehicle subscribers
-            publish(((ModelTypes.Vehicle, route.vehicle.id), Routed(ModelTypes.Vehicle, vehicleJson, routeJson)))
+            publish((ModelId.VehicleId(route.vehicle.id), Routed(ModelTypes.Vehicle, vehicleJson, routeJson)))
             route.actions.tail.collect {
                 case PickUp(lat, lng, com) =>
                     val comJson = Commodity.format.writes(com) // publish commodities to commodity subscribers
-                    publish(((ModelTypes.Commodity, com.id), Routed(ModelTypes.Commodity, comJson, routeJson)))
+                    publish((ModelId.CommodityId(com.id), Routed(ModelTypes.Commodity, comJson, routeJson)))
                 case _Else => Unit
             }
         }
@@ -153,7 +153,7 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 publish(res)
                 cachedRoutes = Some(res)
         }
-        case RouteRequest(client, model, id) => cachedRoutes.map { routes =>
+        case RouteRequest(client, mId) => cachedRoutes.map { routes =>
             Logger.info("using cached routes")
             Future.successful(routes)
         }.getOrElse(
@@ -166,12 +166,12 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
                 client ! Error("Failed to route cluster: "+t.getMessage)
                 Future.failed(t)
         }.foreach( routes =>
-            model match {
-                case ModelTypes.Cluster => client ! clusterRouted(routes)
-                case ModelTypes.Vehicle => routes.find(_.vehicle.id == id).foreach{ route =>
+            mId match {
+                case ModelId.ClusterPath(path) => client ! clusterRouted(routes)
+                case ModelId.VehicleId(id) => routes.find(_.vehicle.id == id).foreach{ route =>
                     client ! vehicleRouted(route)
                 }
-                case ModelTypes.Commodity =>
+                case ModelId.CommodityId(id) =>
                     var commodity: Commodity = null
                     routes.find{ route =>
                         route.actions.exists {
@@ -220,8 +220,8 @@ class ClusterRouter(clusterId: Long) extends EventBusActor with ActorEventBus wi
         )
 
     private def recalculate(): Future[Seq[Route]] = {
-        val cluster: Cluster = Cluster.Dao.read(clusterId).getOrElse{
-            Logger.warn("Cluster with id: "+clusterId+" missing")
+        val cluster: Cluster = Cluster.Dao.read(clusterPath).getOrElse{
+            Logger.warn("Cluster with id: "+clusterPath+" missing")
             return Future.failed(null)
         }
         Logger.info("RECALCULATING")

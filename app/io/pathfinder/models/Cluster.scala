@@ -1,40 +1,34 @@
 package io.pathfinder.models
 
+import java.nio.charset.StandardCharsets
 import java.util
-import javax.persistence.{OneToOne, JoinColumn, ManyToOne, OneToMany, CascadeType, Id, GenerationType, Column, GeneratedValue, Entity}
+import java.util.UUID
+import javax.persistence.{Transient, OneToMany, CascadeType, Id, Column, Entity}
 
 import com.avaje.ebean.Model
-import io.pathfinder.data.{ObserverDao, Resource}
+import com.avaje.ebean.annotation.Transactional
+import io.pathfinder.data.{EbeanCrudDao, Resource}
 import play.api.libs.json.{Json, Format}
-import scala.collection.JavaConverters.asScalaBufferConverter
+import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListConverter}
 import scala.collection.{mutable, Iterator}
 
 object Cluster {
-    val finder: Model.Find[Long, Cluster] = new Model.Finder[Long, Cluster](classOf[Cluster])
-    object Dao extends ObserverDao[Cluster](finder) {
+    val finder: Model.Find[String, Cluster] = new Model.Finder[String, Cluster](classOf[Cluster])
 
-        override protected def onCreated(model: Cluster): Unit = {
+    def byPrefix(path: String): Seq[Cluster] =
+        finder.query().where().startsWith("path", path).findList().asScala
 
-        }
-
-        override protected def onUpdated(model: Cluster): Unit = {
-
-        }
-
-        override protected def onDeleted(model: Cluster): Unit = {
-
-        }
-    }
-
-    val DEFAULT_ID = 0
+    object Dao extends EbeanCrudDao[String, Cluster](finder)
 
     implicit val format: Format[Cluster] = Json.format[Cluster]
     implicit val resourceFormat: Format[ClusterResource] = Json.format[ClusterResource]
 
     case class ClusterResource(
-        parentId: Option[Long],
+        path: Option[String],
+        name: Option[String],
         vehicles: Option[Seq[Vehicle.VehicleResource]],
-        commodities: Option[Seq[Commodity.CommodityResource]]
+        commodities: Option[Seq[Commodity.CommodityResource]],
+        subClusters: Option[Seq[ClusterResource]]
     ) extends Resource[Cluster] {
 
         override def update(model: Cluster): Option[Cluster] = None // Cluster Updates are not supported
@@ -42,64 +36,58 @@ object Cluster {
         /** Creates a new model instance from this resource. */
         override def create: Option[Cluster] = {
             val model = new Cluster
-            parentId.foreach(
-                clusterId =>
-                    model.parent = Some(
-                        Cluster.Dao.read(clusterId).getOrElse(return None)
-                    )
-            )
+            model.path = path.getOrElse(return None) // should validate path
             vehicles.foreach(
                 _.foreach {
-                    vehicleResource => model.vehicles += (
-                        for {
+                    vehicleResource => model.vehicleList.add(
+                        (for {
                             id <- vehicleResource.id
                             model <- Vehicle.Dao.read(id)
                             update <- vehicleResource.update(model)
-                        } yield update
-                    ).orElse(vehicleResource.create(model)).getOrElse(return None)
+                        } yield update).orElse(vehicleResource.create(model)).getOrElse(return None)
+                    )
                 }
             )
             commodities.foreach(
                 _.foreach {
-                    commodityResource => model.commodities += (
-                        for {
+                    commodityResource => model.commodityList.add(
+                        (for {
                             id <- commodityResource.id
                             model <- Commodity.Dao.read(id)
                             update <- commodityResource.update(model)
-                      } yield update
-                    ).orElse(commodityResource.create(model)).getOrElse(return None)
+                        } yield update).orElse(commodityResource.create(model)).getOrElse(return None)
+                    )
                 }
+            )
+            subClusters.foreach(
+                _.foreach(
+                    sub =>
+                        sub.copy(path = sub.path.orElse(Some(path + "/" + sub.name.getOrElse(return None))))
+                )
             )
             Some(model)
         }
     }
 
-    def apply(id: Long, vehicles: Seq[Vehicle], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
+    def apply(path: String, vehicles: Seq[Vehicle], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
         val c = new Cluster
-        c.id = id
-        c.vehicles ++= vehicles
-        c.commodities ++= commodities
-        c.subClusters ++= subClusters
+        c.path = path
+        c.vehicleList.addAll(vehicles.asJava)
+        c.commodityList.addAll(commodities.asJava)
+        c.unsavedSubclusters ++= subClusters
         c
     }
 
-    def unapply(c: Cluster): Option[(Long, Seq[Vehicle], Seq[Commodity], Seq[Cluster])] =
-        Some((c.id, c.vehicles, c.commodities, c.subClusters))
+    def unapply(c: Cluster): Option[(String, Seq[Vehicle], Seq[Commodity], Seq[Cluster])] =
+        Some((c.path, c.vehicles, c.commodities, c.subClusters))
 }
 
+
 @Entity
-class Cluster() extends Model with HasId {
+class Cluster() extends Model {
     @Id
     @Column(nullable = false)
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long = 0
-
-    @ManyToOne
-    @JoinColumn(name="parent_id", nullable = true)
-    var parentCluster: Cluster = null
-
-    @Column
-    var authenticationToken: Array[Byte] = "top secret".getBytes
+    var path: String = null
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
@@ -107,18 +95,16 @@ class Cluster() extends Model with HasId {
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var commodityList: util.List[Commodity] = new util.ArrayList[Commodity]()
 
-    @OneToMany(mappedBy = "parentCluster", cascade=Array(CascadeType.ALL))
-    var clusterList: util.List[Cluster] = new util.ArrayList[Cluster]()
+    def vehicles: Seq[Vehicle] = vehicleList.asScala
 
-    def vehicles: mutable.Buffer[Vehicle] = vehicleList.asScala
+    def commodities: Seq[Commodity] = commodityList.asScala
 
-    def commodities: mutable.Buffer[Commodity] = commodityList.asScala
+    def subClusters: Seq[Cluster] = Cluster.byPrefix(path+"/")
 
-    def subClusters: mutable.Buffer[Cluster] = clusterList.asScala
+    @Transient
+    private val unsavedSubclusters: mutable.Buffer[Cluster] = mutable.Buffer.empty
 
-    def parent: Option[Cluster] = Option(parentCluster)
-
-    def parent_=(opt: Option[Cluster]): Unit = parentCluster = opt.orNull
+    def parent: Option[Cluster] = Option(Cluster.finder.byId(path.substring(0,path.lastIndexOf("/"))))
 
     def parents: Iterator[Cluster] =
         Iterator.iterate[Option[Cluster]](
@@ -131,13 +117,38 @@ class Cluster() extends Model with HasId {
         Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
 
     def application: Application =
-        Application.finder.where().eq("cluster_id",
-            (Iterator(this) ++ parents).dropWhile(_.parent.isDefined).next().id
-        ).findUnique()
+        Application.finder.byId(path.iterator.takeWhile(_ != '/').mkString)
+
+    @Transactional
+    override def delete(): Boolean = {
+        Cluster.byPrefix(path + "/").foreach(_.delete())
+        super.delete()
+    }
+
+    @Transactional
+    override def insert(): Unit = {
+        unsavedSubclusters.foreach(_.insert())
+        unsavedSubclusters.clear()
+        super.insert()
+    }
+
+    @Transactional
+    override def update(): Unit = {
+        unsavedSubclusters.foreach(_.update())
+        unsavedSubclusters.clear()
+        super.update()
+    }
+
+    @Transactional
+    override def save(): Unit = {
+        unsavedSubclusters.foreach(_.save())
+        unsavedSubclusters.clear()
+        super.save()
+    }
 
     override def toString = String.format(
-        "Cluster(id: %s, vehicles: %s, commodities: %s)",
-        id.toString,
+        "Cluster(path: %s, vehicles: %s, commodities: %s)",
+        path,
         util.Arrays.toString(vehicleList.toArray),
         util.Arrays.toString(commodityList.toArray))
 }
