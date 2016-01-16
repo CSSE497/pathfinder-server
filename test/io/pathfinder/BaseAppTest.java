@@ -26,7 +26,7 @@ public class BaseAppTest {
         PATHFINDER_APPLICATION.name_$eq("MY COOL APP");
         cluster.path_$eq(CLUSTER_PATH);
         cluster.insert();
-        PATHFINDER_APPLICATION.cluster_$eq(cluster);
+        cluster.path_$eq(CLUSTER_PATH);
         PATHFINDER_APPLICATION.insert();
         cluster.save();
     }
