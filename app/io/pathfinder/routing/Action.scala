@@ -13,7 +13,7 @@ object Action {
     case class Start(
         latitude: Double,
         longitude: Double
-    ) extends Action("start") {
+    ) extends Action("Start") {
         def this(v: Vehicle) = this(
             v.latitude,
             v.longitude
@@ -28,7 +28,7 @@ object Action {
         latitude: Double,
         longitude: Double,
         commodity: Commodity
-    ) extends CommodityAction("pickup") {
+    ) extends CommodityAction("PickUp") {
         def this(com: Commodity) = this(
             com.startLatitude,
             com.startLongitude,
@@ -40,7 +40,7 @@ object Action {
         latitude: Double,
         longitude: Double,
         commodity: Commodity
-    ) extends CommodityAction("dropoff") {
+    ) extends CommodityAction("DropOff") {
         def this(com: Commodity) = this(
             com.endLatitude,
             com.endLongitude,
