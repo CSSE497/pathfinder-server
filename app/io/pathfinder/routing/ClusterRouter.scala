@@ -35,7 +35,7 @@ object ClusterRouter {
         "Accept" -> "application/json"
     )
 
-    def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.path))
+    def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
     def props(clusterPath: String): Props = Props(new ClusterRouter(clusterPath))
 
     abstract sealed class ClusterRouterMessage

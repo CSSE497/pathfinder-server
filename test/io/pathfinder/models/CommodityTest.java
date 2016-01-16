@@ -90,7 +90,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLongitude", 9.0);
         body.put("param", meta);
         body.put("status",CommodityStatus.Waiting.name());
-        body.put("clusterPath", CLUSTER_PATH);
+        body.put("clusterId", CLUSTER_PATH);
 
         RequestBuilder request = new RequestBuilder()
                 .bodyJson(body)
@@ -137,7 +137,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLongitude", 4.0);
 
         body.put("metadata", meta);
-        body.put("clusterPath", CLUSTER_PATH);
+        body.put("clusterId", CLUSTER_PATH);
 
         RequestBuilder request = new RequestBuilder()
                 .bodyJson(body)

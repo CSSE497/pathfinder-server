@@ -16,7 +16,7 @@ public class BaseAppTest {
     public static final Cluster cluster = new Cluster();
     public static final Application PATHFINDER_APPLICATION = new Application();
     public static final String APPLICATION_ID = "001e7047-ee14-40d6-898a-5acf3a1cfd8a";
-    public static final String CLUSTER_PATH = APPLICATION_ID.toString();
+    public static final String CLUSTER_PATH = APPLICATION_ID;
 
     @Before
     public void startApp() {
@@ -24,9 +24,9 @@ public class BaseAppTest {
         Helpers.start(app);
         PATHFINDER_APPLICATION.id_$eq(APPLICATION_ID);
         PATHFINDER_APPLICATION.name_$eq("MY COOL APP");
-        cluster.path_$eq(CLUSTER_PATH);
+        cluster.id_$eq(CLUSTER_PATH);
         cluster.insert();
-        cluster.path_$eq(CLUSTER_PATH);
+        cluster.id_$eq(CLUSTER_PATH);
         PATHFINDER_APPLICATION.insert();
         cluster.save();
     }

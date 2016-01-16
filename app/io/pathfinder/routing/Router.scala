@@ -64,16 +64,16 @@ object Router extends ActorEventBus with SubchannelClassification {
             case ModelId.ClusterPath(path) =>
                 Cluster.Dao.read(path).getOrElse(return false)
         }
-        if(!subs.contains(cluster.path)){
-            subs.add(cluster.path)
+        if(!subs.contains(cluster.id)){
+            subs.add(cluster.id)
         }
-        publish((cluster.path, Subscribe(client, id)))
+        publish((cluster.id, Subscribe(client, id)))
         publish(cluster, RouteRequest(client, id))
         true
     }
 
     def publish(cluster: Cluster, msg: ClusterRouterMessage): Unit = {
-        publish((cluster.path, msg))
+        publish((cluster.id, msg))
     }
 
     def publish(event: Events.Value, model: HasCluster): Unit = {

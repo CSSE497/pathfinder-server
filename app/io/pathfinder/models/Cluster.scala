@@ -22,7 +22,7 @@ object Cluster {
     implicit val resourceFormat: Format[ClusterResource] = Json.format[ClusterResource]
 
     case class ClusterResource(
-        path: Option[String],
+        id: Option[String],
         name: Option[String],
         vehicles: Option[Seq[Vehicle.VehicleResource]],
         commodities: Option[Seq[Commodity.CommodityResource]],
@@ -34,7 +34,7 @@ object Cluster {
         /** Creates a new model instance from this resource. */
         override def create: Option[Cluster] = {
             val model = new Cluster
-            model.path = path.getOrElse(return None) // should validate path
+            model.id = id.getOrElse(return None) // should validate path
             vehicles.foreach(
                 _.foreach {
                     vehicleResource => model.vehicleList.add(
@@ -60,16 +60,16 @@ object Cluster {
             subClusters.foreach(
                 _.foreach(
                     sub =>
-                        sub.copy(path = sub.path.orElse(Some(path + "/" + sub.name.getOrElse(return None))))
+                        sub.copy(id = sub.id.orElse(Some(id + "/" + sub.name.getOrElse(return None))))
                 )
             )
             Some(model)
         }
     }
 
-    def apply(path: String, vehicles: Seq[Vehicle], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
+    def apply(id: String, vehicles: Seq[Vehicle], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
         val c = new Cluster
-        c.path = path
+        c.id = id
         c.vehicleList.addAll(vehicles.asJava)
         c.commodityList.addAll(commodities.asJava)
         c.unsavedSubclusters ++= subClusters
@@ -77,15 +77,15 @@ object Cluster {
     }
 
     def unapply(c: Cluster): Option[(String, Seq[Vehicle], Seq[Commodity], Seq[Cluster])] =
-        Some((c.path, c.vehicles, c.commodities, c.subClusters))
+        Some((c.id, c.vehicles, c.commodities, c.subClusters))
 }
 
 
 @Entity
 class Cluster() extends Model {
     @Id
-    @Column(nullable = false)
-    var path: String = null
+    @Column(nullable = false, name = "path")
+    var id: String = null
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
@@ -97,12 +97,12 @@ class Cluster() extends Model {
 
     def commodities: Seq[Commodity] = commodityList.asScala
 
-    def subClusters: Seq[Cluster] = Cluster.byPrefix(path+"/")
+    def subClusters: Seq[Cluster] = Cluster.byPrefix(id+"/")
 
     @Transient
     private val unsavedSubclusters: mutable.Buffer[Cluster] = mutable.Buffer.empty
 
-    def parent: Option[Cluster] = Option(Cluster.finder.byId(path.substring(0,path.lastIndexOf("/"))))
+    def parent: Option[Cluster] = Option(Cluster.finder.byId(id.substring(0,id.lastIndexOf("/"))))
 
     def parents: Iterator[Cluster] =
         Iterator.iterate[Option[Cluster]](
@@ -115,11 +115,11 @@ class Cluster() extends Model {
         Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
 
     def application: Application =
-        Application.finder.byId(path.iterator.takeWhile(_ != '/').mkString)
+        Application.finder.byId(id.iterator.takeWhile(_ != '/').mkString)
 
     @Transactional
     override def delete(): Boolean = {
-        Cluster.byPrefix(path + "/").foreach(_.delete())
+        Cluster.byPrefix(id + "/").foreach(_.delete())
         super.delete()
     }
 
@@ -146,7 +146,7 @@ class Cluster() extends Model {
 
     override def toString = String.format(
         "Cluster(path: %s, vehicles: %s, commodities: %s)",
-        path,
+        id,
         util.Arrays.toString(vehicleList.toArray),
         util.Arrays.toString(commodityList.toArray))
 }

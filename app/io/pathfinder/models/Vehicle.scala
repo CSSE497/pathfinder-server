@@ -27,7 +27,7 @@ object Vehicle {
         id:        Option[Long],
         latitude:  Option[Double],
         longitude: Option[Double],
-        clusterPath: Option[String],
+        clusterId: Option[String],
         status:    Option[VehicleStatus],
         metadata:  Option[JsObject]
     ) extends Resource[Vehicle] {
@@ -35,7 +35,7 @@ object Vehicle {
             latitude.foreach(v.latitude = _)
             longitude.foreach(v.longitude = _)
             status.foreach(v.status = _)
-            clusterPath.foreach {
+            clusterId.foreach {
                 Cluster.Dao.read(_).foreach(v.cluster = _)
             }
             metadata.foreach(v.metadata = _)
@@ -56,7 +56,7 @@ object Vehicle {
         }
 
         override def create: Option[Vehicle] = for {
-            id <- clusterPath
+            id <- clusterId
             cluster <- Cluster.Dao.read(id)
             mod <- create(cluster)
         } yield mod

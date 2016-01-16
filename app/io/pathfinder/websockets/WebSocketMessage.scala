@@ -45,7 +45,7 @@ object WebSocketMessage {
     }
 
     sealed abstract class SubscriptionMessage extends WebSocketMessage {
-        def clusterPath: Option[String]
+        def clusterId: Option[String]
         def model: Option[ModelType]
         def id: Option[ModelId]
     }
@@ -61,7 +61,7 @@ object WebSocketMessage {
     private def subscriptionMessageFormat[M <: SubscriptionMessage](
         makeMessage: (Option[String], Option[ModelType], Option[ModelId]) => M
     ) = {
-            (__ \ "clusterPath").formatNullable[String] and
+            (__ \ "clusterId").formatNullable[String] and
             (__ \ "model").formatNullable(ModelTypes.format) and
             (__ \ "id").formatNullable[JsValue]
     }.apply[M](
@@ -72,7 +72,7 @@ object WebSocketMessage {
                 id.map(i => ModelId.read(model.getOrElse(ModelTypes.Cluster), i).get)
             )
         }, {
-            sub: M => (sub.clusterPath, sub.model, sub.id.map(ModelId.write))
+            sub: M => (sub.clusterId, sub.model, sub.id.map(ModelId.write))
         }
     )
 
@@ -106,7 +106,7 @@ object WebSocketMessage {
      * Sent by the client to unsubscribe from push notifications
      */
     case class Unsubscribe(
-        clusterPath: Option[String],
+        clusterId: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
@@ -123,7 +123,7 @@ object WebSocketMessage {
      * Sent by the client to subscribe to push notifications
      */
     case class Subscribe(
-        clusterPath: Option[String],
+        clusterId: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
@@ -377,7 +377,7 @@ object WebSocketMessage {
      * Message sent to a client that requested a subscribe
      */
     case class Subscribed(
-        clusterPath: Option[String],
+        clusterId: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
@@ -394,7 +394,7 @@ object WebSocketMessage {
      * Message sent to a client that requested to unsubscribe
      */
     case class Unsubscribed(
-        clusterPath: Option[String],
+        clusterId: Option[String],
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
