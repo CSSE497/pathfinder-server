@@ -3,7 +3,7 @@ package io.pathfinder.models
 import java.nio.charset.StandardCharsets
 import java.util
 import java.util.UUID
-import javax.persistence.{OneToMany, CascadeType, Id, Column, Entity}
+import javax.persistence.{Transient, OneToMany, CascadeType, Id, Column, Entity}
 
 import com.avaje.ebean.Model
 import com.avaje.ebean.annotation.Transactional
@@ -89,9 +89,6 @@ class Cluster() extends Model {
     @Column(nullable = false)
     var path: String = null
 
-    @Column
-    var authenticationToken: Array[Byte] = "top secret".getBytes(StandardCharsets.UTF_8)
-
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
 
@@ -104,6 +101,7 @@ class Cluster() extends Model {
 
     def subClusters: Seq[Cluster] = Cluster.byPrefix(path+"/")
 
+    @Transient
     private val unsavedSubclusters: mutable.Buffer[Cluster] = mutable.Buffer.empty
 
     def parent: Option[Cluster] = Option(Cluster.finder.byId(path.substring(0,path.lastIndexOf("/"))))

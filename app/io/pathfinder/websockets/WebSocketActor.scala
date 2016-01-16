@@ -12,6 +12,8 @@ import io.pathfinder.websockets.pushing.PushSubscriber
 import play.Logger
 import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
 
+import scala.util.Try
+
 object WebSocketActor {
     val controllers: Map[ModelType, WebSocketController] = Map(
         ModelTypes.Vehicle -> VehicleSocketController,
@@ -37,7 +39,7 @@ class WebSocketActor (
     import WebSocketActor.{controllers, observers}
 
     override def receive = {
-        case m: WebSocketMessage => {
+        case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
             m match {
                 case RouteSubscribe(id) =>
@@ -111,6 +113,9 @@ class WebSocketActor (
                 case UnknownMessage(value) => client ! Error("Received unknown message: " + value.toString)
                 case x => client ! Error("received unknown value: "+ x.toString)
             }
+        }.recover{ case e =>
+            e.printStackTrace()
+            client ! Error("Unhandled Exception: " + e.getMessage + " : " + e.getStackTrace.mkString("\n\t"))
         }
     }
 }

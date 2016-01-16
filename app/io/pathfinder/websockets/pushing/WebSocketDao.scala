@@ -25,9 +25,9 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
 
     def writer: Writes[V]
 
-    val byIdPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props)
+    val byIdPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props[Long])
 
-    val byClusterPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props)
+    val byClusterPusher: ActorRef = Global.actorSystem.actorOf(SocketMessagePusher.props[String])
 
     protected def onCreated(model: V): Unit = {
         Logger.info("Adding model to create channel: " + model)

@@ -91,7 +91,7 @@ class Vehicle() extends Model with HasId with HasCluster {
     var longitude: Double = 0
 
     @ManyToOne
-    @JoinColumn
+    @JoinColumn(name = "cluster_path")
     var cluster: Cluster = null
 
     @Column(nullable=false)
