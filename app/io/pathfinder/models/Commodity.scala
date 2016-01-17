@@ -33,6 +33,7 @@ object Commodity {
         status: Option[CommodityStatus],
         metadata:  Option[JsObject],
         clusterId: Option[String]
+        vehicle: Option[Vehicle]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
             startLatitude.foreach(c.startLatitude  = _)
@@ -40,7 +41,14 @@ object Commodity {
             endLatitude.foreach(c.endLatitude = _)
             endLongitude.foreach(c.endLongitude = _)
             metadata.foreach(c.metadata  = _)
-            status.foreach(c.status = _)
+            status.foreach{
+                newStatus =>
+                    c.status = newStatus
+                    if(c.status == CommodityStatus.PickedUp)
+                        vehicle.orElse(return None).foreach(c.vehicle = _)
+                    else
+                        c.vehicle = null // don't know what should happen here
+            }
             Some(c)
         }
 
@@ -57,7 +65,8 @@ object Commodity {
                     endLatitude,
                     endLongitude,
                     status.getOrElse(CommodityStatus.Inactive),
-                    metadata.getOrElse(JsObject(Seq.empty))
+                    metadata.getOrElse(JsObject(Seq.empty)),
+                    vehicle
                 )
                 c.cluster = cluster
                 c
@@ -70,8 +79,17 @@ object Commodity {
         } yield model
     }
 
-    def apply(id: Long, startLatitude: Double, startLongitude: Double, endLatitude: Double,
-              endLongitude: Double, status: CommodityStatus, metadata: JsObject): Commodity = {
+    def apply(
+        id: Long,
+        startLatitude:
+        Double,
+        startLongitude: Double,
+        endLatitude: Double,
+        endLongitude: Double,
+        status: CommodityStatus,
+        metadata: JsObject,
+        vehicle: Option[Vehicle]
+    ): Commodity = {
         val c = new Commodity
         c.id = id
         c.startLatitude = startLatitude
@@ -83,8 +101,17 @@ object Commodity {
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject)] =
-        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.status, c.metadata))
+    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject, Option[Vehicle])] =
+        Some((
+            c.id,
+            c.startLatitude,
+            c.startLongitude,
+            c.endLatitude,
+            c.endLongitude,
+            c.status,
+            c.metadata,
+            Option(c.vehicle)
+        ))
 }
 
 @Entity
@@ -113,7 +140,11 @@ class Commodity() extends Model with HasId with HasCluster {
     @Column(length = 255)
     var metadata: JsObject = JsObject(Seq.empty)
 
-    @JoinColumn(name = "cluster_path")
+    @JoinColumn
+    @ManyToOne(optional = true)
+    var vehicle: Vehicle = null
+
+    @JoinColumn
     @ManyToOne
     var cluster: Cluster = null
 }

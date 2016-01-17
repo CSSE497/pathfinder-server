@@ -1,11 +1,14 @@
 package io.pathfinder.models
 
+import java.util
+
 import com.avaje.ebean.Model
 import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
-import javax.persistence.{Enumerated, JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
+import javax.persistence.{CascadeType, OneToMany, Enumerated, JoinColumn, ManyToOne, Id, Column, Entity, GeneratedValue, GenerationType}
 import play.api.libs.json.{JsObject, Writes, Format, Json}
+import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListConverter}
 
 object Vehicle {
 
@@ -29,7 +32,8 @@ object Vehicle {
         longitude: Option[Double],
         clusterId: Option[String],
         status:    Option[VehicleStatus],
-        metadata:  Option[JsObject]
+        metadata:  Option[JsObject],
+        commodities: Option[Seq[Commodity]]
     ) extends Resource[Vehicle] {
         override def update(v: Vehicle): Option[Vehicle] = {
             latitude.foreach(v.latitude = _)
@@ -39,6 +43,7 @@ object Vehicle {
                 Cluster.Dao.read(_).foreach(v.cluster = _)
             }
             metadata.foreach(v.metadata = _)
+            commodities.foreach(cs => v.commodityList.addAll(cs.asJava))
             Some(v)
         }
 
@@ -49,7 +54,7 @@ object Vehicle {
             } yield {
                 val stat = status.getOrElse(VehicleStatus.Offline)
                 val met = metadata.getOrElse(JsObject(Seq.empty))
-                val v = Vehicle(id.getOrElse(0),lat,lng,stat,met)
+                val v = Vehicle(id.getOrElse(0),lat,lng,stat,met,commodities)
                 v.cluster = c
                 v
             }
@@ -62,18 +67,26 @@ object Vehicle {
         } yield mod
     }
 
-    def apply(id: Long, latitude: Double, longitude: Double, status: VehicleStatus, metadata: JsObject): Vehicle = {
+    def apply(
+        id: Long,
+        latitude: Double,
+        longitude: Double,
+        status: VehicleStatus,
+        metadata: JsObject,
+        commodities: Option[Seq[Commodity]]
+    ): Vehicle = {
         val v = new Vehicle
         v.id = id
         v.latitude = latitude
         v.longitude = longitude
         v.status = status
         v.metadata = metadata
+        commodities.map(cs => v.commodityList.addAll(cs.asJava))
         v
     }
 
-    def unapply(v: Vehicle): Option[(Long, Double, Double, VehicleStatus, JsObject)] =
-        Some((v.id, v.latitude, v.longitude, v.status, v.metadata))
+    def unapply(v: Vehicle): Option[(Long, Double, Double, VehicleStatus, JsObject, Option[Seq[Commodity]])] =
+        Some((v.id, v.latitude, v.longitude, v.status, v.metadata, Some(v.commodities)))
 }
 
 @Entity
@@ -100,6 +113,11 @@ class Vehicle() extends Model with HasId with HasCluster {
 
     @Column(length = 255)
     var metadata: JsObject = JsObject(Seq.empty)
+
+    @OneToMany(mappedBy = "vehicle", cascade=Array(CascadeType.ALL))
+    var commodityList: java.util.List[Commodity] = new util.ArrayList[Commodity]()
+
+    def commodities: Seq[Commodity] = commodityList.asScala
 
     override def toString = {
         "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + status + ", " + metadata +")"
