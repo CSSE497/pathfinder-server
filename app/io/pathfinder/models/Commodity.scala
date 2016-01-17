@@ -32,8 +32,8 @@ object Commodity {
         endLongitude: Option[Double],
         status: Option[CommodityStatus],
         metadata:  Option[JsObject],
-        clusterId: Option[String]
-        vehicle: Option[Vehicle]
+        clusterPath: Option[String],
+        vehicleId: Option[Long]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
             startLatitude.foreach(c.startLatitude  = _)
@@ -45,7 +45,7 @@ object Commodity {
                 newStatus =>
                     c.status = newStatus
                     if(c.status == CommodityStatus.PickedUp)
-                        vehicle.orElse(return None).foreach(c.vehicle = _)
+                        vehicleId.orElse(return None).foreach{id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None)}
                     else
                         c.vehicle = null // don't know what should happen here
             }
@@ -58,15 +58,18 @@ object Commodity {
                 endLatitude <- endLatitude
                 endLongitude <- endLongitude
             } yield {
+                val stat = status.getOrElse(CommodityStatus.Inactive)
                 val c = Commodity(
                     0,
                     startLatitude,
                     startLongitude,
                     endLatitude,
                     endLongitude,
-                    status.getOrElse(CommodityStatus.Inactive),
+                    stat,
                     metadata.getOrElse(JsObject(Seq.empty)),
-                    vehicle
+                    if(stat == CommodityStatus.PickedUp)
+                        vehicleId.orElse(return None).flatMap(Vehicle.Dao.read(_).orElse(return None))
+                    else None
                 )
                 c.cluster = cluster
                 c
