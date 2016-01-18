@@ -41,9 +41,17 @@ public class CommodityTest extends BaseAppTest {
     private static final double END_LONGITUDE = 100.9;
     private static final CommodityStatus STATUS = CommodityStatus.Waiting;
     private static final int PARAM = 5;
-    private static final String JSON_COMMODITY = String.format(
-        "{\"id\":%d,\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\",\"metadata\":{\"param\":%d}}",
-        ID, START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM);
+    private static final String JSON_COMMODITY = String.format("{" +
+        "\"id\":%d," +
+        "\"startLatitude\":%f," +
+        "\"startLongitude\":%f," +
+        "\"endLatitude\":%f," +
+        "\"endLongitude\":%f," +
+        "\"status\":\"%s\"," +
+        "\"metadata\":{\"param\":%d}," +
+        "\"clusterId\":\"%s\"" +
+    "}", ID, START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM, CLUSTER_ID);
+
     private static final String JSON_PARTIAL_COMMODITY = String.format(
         "{\"startLatitude\":%f,\"startLongitude\":%f,\"endLatitude\":%f,\"endLongitude\":%f,\"status\":\"%s\", \"metadata\":{\"param\":%d}}",
         START_LATITUDE, START_LONGITUDE, END_LATITUDE, END_LONGITUDE, STATUS, PARAM);
@@ -71,7 +79,7 @@ public class CommodityTest extends BaseAppTest {
     @Test
     public void ebeanModelShouldBeValid() {
         Commodity commodity =
-            Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, getParameter(1), Option.apply(null));
+            Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, getParameter(1), Option.apply(null),CLUSTER_ID);
         commodity.cluster_$eq(cluster);
         commodity.save();
         assertEquals(1, Commodity.finder().all().size());
@@ -195,9 +203,9 @@ public class CommodityTest extends BaseAppTest {
 
     private void populateCommodities() {
         Commodity commodity1 =
-            Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, getParameter(5), Option.apply(null));
+            Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, getParameter(5), Option.apply(null),CLUSTER_ID);
         Commodity commodity2 =
-            Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, getParameter(50), Option.apply(null));
+            Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, getParameter(50), Option.apply(null),CLUSTER_ID);
         commodity1.cluster_$eq(cluster);
         commodity2.cluster_$eq(cluster);
         commodity1.save();

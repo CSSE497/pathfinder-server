@@ -12,11 +12,15 @@ import play.test.Helpers;
  * need to be added to a cluster. One is created an inserted here for convenience.
  */
 public class BaseAppTest {
-    public static FakeApplication app;
-    public static final Cluster cluster = new Cluster();
-    public static final Application PATHFINDER_APPLICATION = new Application();
+    public FakeApplication app;
+    public final Cluster cluster = new Cluster();
+    public final Application PATHFINDER_APPLICATION = new Application();
     public static final String APPLICATION_ID = "001e7047-ee14-40d6-898a-5acf3a1cfd8a";
     public static final String CLUSTER_ID = APPLICATION_ID;
+
+    public Cluster baseCluster() {
+        return Cluster.finder().byId(CLUSTER_ID);
+    }
 
     @Before
     public void startApp() {
