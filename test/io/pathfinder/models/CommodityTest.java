@@ -11,7 +11,6 @@ import play.api.libs.json.*;
 import play.mvc.Result;
 import play.test.Helpers;
 import play.mvc.Http.RequestBuilder;
-import play.test.FakeApplication;
 import play.core.j.JavaResultExtractor;
 
 import org.junit.Test;
@@ -71,7 +70,8 @@ public class CommodityTest extends BaseAppTest {
 
     @Test
     public void ebeanModelShouldBeValid() {
-        Commodity commodity = Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, getParameter(1));
+        Commodity commodity =
+            Commodity.apply(1, 1.0, 1.0, 1.0, 1.0,CommodityStatus.Waiting, getParameter(1), Option.apply(null));
         commodity.cluster_$eq(cluster);
         commodity.save();
         assertEquals(1, Commodity.finder().all().size());
@@ -90,7 +90,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLongitude", 9.0);
         body.put("param", meta);
         body.put("status",CommodityStatus.Waiting.name());
-        body.put("clusterId", CLUSTER_PATH);
+        body.put("clusterId", CLUSTER_ID);
 
         RequestBuilder request = new RequestBuilder()
                 .bodyJson(body)
@@ -137,7 +137,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLongitude", 4.0);
 
         body.put("metadata", meta);
-        body.put("clusterId", CLUSTER_PATH);
+        body.put("clusterId", CLUSTER_ID);
 
         RequestBuilder request = new RequestBuilder()
                 .bodyJson(body)
@@ -194,8 +194,10 @@ public class CommodityTest extends BaseAppTest {
     }
 
     private void populateCommodities() {
-        Commodity commodity1 = Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, getParameter(5));
-        Commodity commodity2 = Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, getParameter(50));
+        Commodity commodity1 =
+            Commodity.apply(1, 1.0, 2.0, 3.0, 4.0, CommodityStatus.Waiting, getParameter(5), Option.apply(null));
+        Commodity commodity2 =
+            Commodity.apply(2, 10.0, 20.0, 30.0, 40.0, CommodityStatus.Waiting, getParameter(50), Option.apply(null));
         commodity1.cluster_$eq(cluster);
         commodity2.cluster_$eq(cluster);
         commodity1.save();

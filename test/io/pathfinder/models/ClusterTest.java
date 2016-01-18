@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
 
+import scala.Option;
 import scala.collection.JavaConversions;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -68,14 +69,30 @@ public class ClusterTest {
         Random rand = new Random();
         Map<String,JsValue> meta = new HashMap<>();
         meta.put("capacity", new JsNumber(BigDecimal.valueOf(rand.nextInt())));
-        return Vehicle.apply(id_count++, rand.nextDouble(), rand.nextDouble(), VehicleStatus.Online, new JsObject(meta));
+        return Vehicle.apply(
+            id_count++,
+            rand.nextDouble(),
+            rand.nextDouble(),
+            VehicleStatus.Online,
+            new JsObject(meta),
+            Option.apply(null)
+        );
     }
 
     public Commodity createCommodity() {
         Random rand = new Random();
         Map<String,JsValue> meta = new HashMap<>();
         meta.put("volume", new JsNumber(BigDecimal.valueOf(rand.nextInt())));
-        return Commodity.apply(id_count++, rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble(),CommodityStatus.Waiting, new JsObject(meta));
+        return Commodity.apply(
+            id_count++,
+            rand.nextDouble(),
+            rand.nextDouble(),
+            rand.nextDouble(),
+            rand.nextDouble(),
+            CommodityStatus.Waiting,
+            new JsObject(meta),
+            Option.apply(null)
+        );
     }
 
     private static <T> scala.collection.mutable.Buffer newList() {

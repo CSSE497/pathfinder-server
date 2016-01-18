@@ -14,7 +14,7 @@ object Cluster {
     val finder: Model.Find[String, Cluster] = new Model.Finder[String, Cluster](classOf[Cluster])
 
     def byPrefix(path: String): Seq[Cluster] =
-        finder.query().where().startsWith("path", path).findList().asScala
+        finder.query().where().startsWith("id", path).findList().asScala
 
     object Dao extends EbeanCrudDao[String, Cluster](finder)
 
@@ -84,7 +84,7 @@ object Cluster {
 @Entity
 class Cluster() extends Model {
     @Id
-    @Column(nullable = false, name = "path")
+    @Column(nullable = false)
     var id: String = null
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
@@ -145,7 +145,7 @@ class Cluster() extends Model {
     }
 
     override def toString = String.format(
-        "Cluster(path: %s, vehicles: %s, commodities: %s)",
+        "Cluster(id: %s, vehicles: %s, commodities: %s)",
         id,
         util.Arrays.toString(vehicleList.toArray),
         util.Arrays.toString(commodityList.toArray))

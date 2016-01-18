@@ -7,6 +7,7 @@ import com.avaje.ebean.Model
 import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
+import play.Logger
 
 import play.api.libs.json.{JsObject, Writes, Json, Format}
 
@@ -32,7 +33,8 @@ object Commodity {
         endLongitude: Option[Double],
         status: Option[CommodityStatus],
         metadata:  Option[JsObject],
-        clusterId: Option[String]
+        clusterId: Option[String],
+        vehicleId: Option[Long]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
             startLatitude.foreach(c.startLatitude  = _)
@@ -40,7 +42,15 @@ object Commodity {
             endLatitude.foreach(c.endLatitude = _)
             endLongitude.foreach(c.endLongitude = _)
             metadata.foreach(c.metadata  = _)
-            status.foreach(c.status = _)
+            status.foreach{
+                newStatus =>
+                    c.status = newStatus
+                    if(c.status.equals(CommodityStatus.PickedUp)) {
+                        vehicleId.orElse(return None).foreach { id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None) }
+                    } else {
+                        c.vehicle = null // don't know what should happen here
+                    }
+            }
             Some(c)
         }
 
@@ -50,14 +60,17 @@ object Commodity {
                 endLatitude <- endLatitude
                 endLongitude <- endLongitude
             } yield {
+                val stat = status.getOrElse(CommodityStatus.Inactive)
+                Logger.info(stat.toString)
                 val c = Commodity(
                     0,
                     startLatitude,
                     startLongitude,
                     endLatitude,
                     endLongitude,
-                    status.getOrElse(CommodityStatus.Inactive),
-                    metadata.getOrElse(JsObject(Seq.empty))
+                    stat,
+                    metadata.getOrElse(JsObject(Seq.empty)),
+                    vehicleId
                 )
                 c.cluster = cluster
                 c
@@ -70,8 +83,17 @@ object Commodity {
         } yield model
     }
 
-    def apply(id: Long, startLatitude: Double, startLongitude: Double, endLatitude: Double,
-              endLongitude: Double, status: CommodityStatus, metadata: JsObject): Commodity = {
+    def apply(
+        id: Long,
+        startLatitude:
+        Double,
+        startLongitude: Double,
+        endLatitude: Double,
+        endLongitude: Double,
+        status: CommodityStatus,
+        metadata: JsObject,
+        vehicleId: Option[Long]
+    ): Commodity = {
         val c = new Commodity
         c.id = id
         c.startLatitude = startLatitude
@@ -80,11 +102,23 @@ object Commodity {
         c.endLongitude = endLongitude
         c.status = status
         c.metadata = metadata
+        c.vehicle = vehicleId.flatMap{
+            vId => Vehicle.Dao.read(vId).orElse(throw new Exception("no vehicle with " + " id: " + vId))
+        }.orNull
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject)] =
-        Some((c.id, c.startLatitude, c.startLongitude, c.endLatitude, c.endLongitude, c.status, c.metadata))
+    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject, Option[Long])] =
+        Some((
+            c.id,
+            c.startLatitude,
+            c.startLongitude,
+            c.endLatitude,
+            c.endLongitude,
+            c.status,
+            c.metadata,
+            Option(c.vehicle).map(_.id)
+        ))
 }
 
 @Entity
@@ -113,7 +147,11 @@ class Commodity() extends Model with HasId with HasCluster {
     @Column(length = 255)
     var metadata: JsObject = JsObject(Seq.empty)
 
-    @JoinColumn(name = "cluster_path")
+    @JoinColumn
+    @ManyToOne(optional = true)
+    var vehicle: Vehicle = null
+
+    @JoinColumn
     @ManyToOne
     var cluster: Cluster = null
 }
