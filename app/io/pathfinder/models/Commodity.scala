@@ -7,6 +7,7 @@ import com.avaje.ebean.Model
 import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
+import play.Logger
 
 import play.api.libs.json.{JsObject, Writes, Json, Format}
 
@@ -44,10 +45,11 @@ object Commodity {
             status.foreach{
                 newStatus =>
                     c.status = newStatus
-                    if(c.status == CommodityStatus.PickedUp)
-                        vehicleId.orElse(return None).foreach{id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None)}
-                    else
+                    if(c.status.equals(CommodityStatus.PickedUp)) {
+                        vehicleId.orElse(return None).foreach { id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None) }
+                    } else {
                         c.vehicle = null // don't know what should happen here
+                    }
             }
             Some(c)
         }
@@ -59,6 +61,7 @@ object Commodity {
                 endLongitude <- endLongitude
             } yield {
                 val stat = status.getOrElse(CommodityStatus.Inactive)
+                Logger.info(stat.toString)
                 val c = Commodity(
                     0,
                     startLatitude,
@@ -67,9 +70,7 @@ object Commodity {
                     endLongitude,
                     stat,
                     metadata.getOrElse(JsObject(Seq.empty)),
-                    if(stat == CommodityStatus.PickedUp)
-                        vehicleId.orElse(return None).flatMap(Vehicle.Dao.read(_).orElse(return None))
-                    else None
+                    vehicleId
                 )
                 c.cluster = cluster
                 c
@@ -91,7 +92,7 @@ object Commodity {
         endLongitude: Double,
         status: CommodityStatus,
         metadata: JsObject,
-        vehicle: Option[Vehicle]
+        vehicleId: Option[Long]
     ): Commodity = {
         val c = new Commodity
         c.id = id
@@ -101,10 +102,13 @@ object Commodity {
         c.endLongitude = endLongitude
         c.status = status
         c.metadata = metadata
+        c.vehicle = vehicleId.flatMap{
+            vId => Vehicle.Dao.read(vId).orElse(throw new Exception("no vehicle with " + " id: " + vId))
+        }.orNull
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject, Option[Vehicle])] =
+    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject, Option[Long])] =
         Some((
             c.id,
             c.startLatitude,
@@ -113,7 +117,7 @@ object Commodity {
             c.endLongitude,
             c.status,
             c.metadata,
-            Option(c.vehicle)
+            Option(c.vehicle).map(_.id)
         ))
 }
 
