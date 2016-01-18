@@ -35,7 +35,7 @@ public class WebSocketActorTest extends BaseAppTest {
         Json.parse("{\"message\":\"Create\"," +
                     "\"model\":\"Cluster\"," +
                     "\"value\":{" +
-                        "\"id\":\"" + CLUSTER_PATH + "/subcluster\"" +
+                        "\"id\":\"" + CLUSTER_ID + "/subcluster\"" +
                     "}}");
     private static final JsValue JSON_CREATE_VEHICLE =
         Json.parse("{\"message\":\"Create\"," +
@@ -43,7 +43,7 @@ public class WebSocketActorTest extends BaseAppTest {
                     "\"value\":{" +
                         "\"latitude\":0.1," +
                         "\"longitude\":-12.3," +
-                        "\"clusterId\":\"" + CLUSTER_PATH + "\"," +
+                        "\"clusterId\":\"" + CLUSTER_ID + "\"," +
                         "\"metadata\":{\"capacity\":99}," +
                         "\"status\":\"Online\"" +
                     "}}");
@@ -55,7 +55,7 @@ public class WebSocketActorTest extends BaseAppTest {
                         "\"startLongitude\":-12.3," +
                         "\"endLatitude\":99.4," +
                         "\"endLongitude\":-3.5," +
-                        "\"clusterId\":\"" + CLUSTER_PATH + "\"," +
+                        "\"clusterId\":\"" + CLUSTER_ID + "\"," +
                         "\"metadata\":{\"param\":5}" +
                     "}}");
     private static final JsValue JSON_GET_APPLICATION_CLUSTER =
@@ -73,7 +73,7 @@ public class WebSocketActorTest extends BaseAppTest {
 
     @Test
     public void testCreateCluster() throws Exception {
-        final String PATH = CLUSTER_PATH + "/subcluster";
+        final String PATH = CLUSTER_ID + "/subcluster";
         Patterns.ask(socket, WebSocketMessage.format().reads(JSON_CREATE_CLUSTER).get(), TIMEOUT);
         Cluster createdCluster = new Cluster();
         createdCluster.id_$eq(PATH);
@@ -118,7 +118,7 @@ public class WebSocketActorTest extends BaseAppTest {
     public void testGetApplicationClusters() {
         Patterns.ask(socket, WebSocketMessage.format().reads(JSON_GET_APPLICATION_CLUSTER).get(), TIMEOUT);
         JsValue json = Json.parse("{" +
-                "\"id\":\"" + CLUSTER_PATH + "\"," +
+                "\"id\":\"" + CLUSTER_ID + "\"," +
                 "\"vehicles\":[]," +
                 "\"commodities\":[]," +
                 "\"subClusters\":[]" +

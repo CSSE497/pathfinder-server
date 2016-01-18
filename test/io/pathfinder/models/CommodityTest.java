@@ -11,7 +11,6 @@ import play.api.libs.json.*;
 import play.mvc.Result;
 import play.test.Helpers;
 import play.mvc.Http.RequestBuilder;
-import play.test.FakeApplication;
 import play.core.j.JavaResultExtractor;
 
 import org.junit.Test;
@@ -91,7 +90,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLongitude", 9.0);
         body.put("param", meta);
         body.put("status",CommodityStatus.Waiting.name());
-        body.put("clusterId", CLUSTER_PATH);
+        body.put("clusterId", CLUSTER_ID);
 
         RequestBuilder request = new RequestBuilder()
                 .bodyJson(body)
@@ -138,7 +137,7 @@ public class CommodityTest extends BaseAppTest {
         body.put("endLongitude", 4.0);
 
         body.put("metadata", meta);
-        body.put("clusterId", CLUSTER_PATH);
+        body.put("clusterId", CLUSTER_ID);
 
         RequestBuilder request = new RequestBuilder()
                 .bodyJson(body)
