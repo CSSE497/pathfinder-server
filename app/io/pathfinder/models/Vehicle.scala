@@ -54,7 +54,7 @@ object Vehicle {
             } yield {
                 val stat = status.getOrElse(VehicleStatus.Offline)
                 val met = metadata.getOrElse(JsObject(Seq.empty))
-                val v = Vehicle(id.getOrElse(0),lat,lng,stat,met,commodities)
+                val v = Vehicle(id.getOrElse(0),lat,lng,stat,met,commodities, c.id)
                 v.cluster = c
                 v
             }
@@ -73,7 +73,8 @@ object Vehicle {
         longitude: Double,
         status: VehicleStatus,
         metadata: JsObject,
-        commodities: Option[Seq[Commodity]]
+        commodities: Option[Seq[Commodity]],
+        clusterId: String
     ): Vehicle = {
         val v = new Vehicle
         v.id = id
@@ -82,11 +83,14 @@ object Vehicle {
         v.status = status
         v.metadata = metadata
         commodities.map(cs => v.commodityList.addAll(cs.asJava))
+        v.cluster = Cluster.Dao.read(clusterId).getOrElse(
+            throw new IllegalArgumentException("No Cluster with id: " + clusterId +" found")
+        )
         v
     }
 
-    def unapply(v: Vehicle): Option[(Long, Double, Double, VehicleStatus, JsObject, Option[Seq[Commodity]])] =
-        Some((v.id, v.latitude, v.longitude, v.status, v.metadata, Some(v.commodities)))
+    def unapply(v: Vehicle): Option[(Long, Double, Double, VehicleStatus, JsObject, Option[Seq[Commodity]], String)] =
+        Some((v.id, v.latitude, v.longitude, v.status, v.metadata, Some(v.commodities), v.cluster.id))
 }
 
 @Entity

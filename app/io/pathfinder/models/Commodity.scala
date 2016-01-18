@@ -70,7 +70,8 @@ object Commodity {
                     endLongitude,
                     stat,
                     metadata.getOrElse(JsObject(Seq.empty)),
-                    vehicleId
+                    vehicleId,
+                    cluster.id
                 )
                 c.cluster = cluster
                 c
@@ -92,7 +93,8 @@ object Commodity {
         endLongitude: Double,
         status: CommodityStatus,
         metadata: JsObject,
-        vehicleId: Option[Long]
+        vehicleId: Option[Long],
+        clusterId: String
     ): Commodity = {
         val c = new Commodity
         c.id = id
@@ -103,13 +105,17 @@ object Commodity {
         c.status = status
         c.metadata = metadata
         c.vehicle = vehicleId.flatMap{
-            vId => Vehicle.Dao.read(vId).orElse(throw new Exception("no vehicle with " + " id: " + vId))
+            vId => Vehicle.Dao.read(vId).orElse(throw new IllegalArgumentException("no vehicle with " + " id: " + vId))
         }.orNull
+        c.cluster = Cluster.Dao.read(clusterId).getOrElse(
+            throw new IllegalArgumentException("No Cluster With Id: " + clusterId)
+        )
         c
     }
 
-    def unapply(c: Commodity): Option[(Long, Double, Double, Double, Double, CommodityStatus, JsObject, Option[Long])] =
-        Some((
+    def unapply(c: Commodity): Option[
+        (Long, Double, Double, Double, Double, CommodityStatus, JsObject, Option[Long], String)
+    ] = Some((
             c.id,
             c.startLatitude,
             c.startLongitude,
@@ -117,7 +123,8 @@ object Commodity {
             c.endLongitude,
             c.status,
             c.metadata,
-            Option(c.vehicle).map(_.id)
+            Option(c.vehicle).map(_.id),
+            c.cluster.id
         ))
 }
 
