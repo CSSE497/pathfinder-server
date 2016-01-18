@@ -93,6 +93,7 @@ public class WebSocketActorTest extends BaseAppTest {
         meta.put("capacity", new JsNumber(BigDecimal.valueOf(99)));
         createdVehicle.metadata_$eq(new JsObject(meta));
         createdVehicle.status_$eq(VehicleStatus.Online);
+        createdVehicle.cluster_$eq(baseCluster());
         client.expectMsg(new WebSocketMessage.Created(
                 ModelTypes.Vehicle(), Vehicle.format().writes(createdVehicle)));
     }
@@ -107,6 +108,7 @@ public class WebSocketActorTest extends BaseAppTest {
         createdCommodity.startLongitude_$eq(-12.3);
         createdCommodity.endLatitude_$eq(99.4);
         createdCommodity.endLongitude_$eq(-3.5);
+        createdCommodity.cluster_$eq(baseCluster());
         Map<String,JsValue> meta = new HashMap<>();
         meta.put("param", new JsNumber(BigDecimal.valueOf(5)));
         createdCommodity.metadata_$eq(new JsObject(meta));

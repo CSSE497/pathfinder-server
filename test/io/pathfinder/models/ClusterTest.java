@@ -3,6 +3,7 @@ package io.pathfinder.models;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import io.pathfinder.BaseAppTest;
 import play.api.libs.json.JsNumber;
 import play.api.libs.json.JsObject;
 import play.api.libs.json.JsValue;
@@ -35,9 +36,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
-public class ClusterTest {
+public class ClusterTest extends BaseAppTest {
     private JsonNodeFactory jsonNodeFactory = JsonNodeFactory.instance;
-    private FakeApplication fakeApp;
 
     private JsonNode bodyForResult(Result r) {
         String resultBody;
@@ -55,16 +55,6 @@ public class ClusterTest {
 
     static int id_count = 1;
 
-    @Before
-    public void setup() {
-        fakeApp = Helpers.fakeApplication(Helpers.inMemoryDatabase());
-    }
-
-    @After
-    public void teardown() {
-        Helpers.stop(fakeApp);
-    }
-
     public Vehicle createVehicle() {
         Random rand = new Random();
         Map<String,JsValue> meta = new HashMap<>();
@@ -75,7 +65,8 @@ public class ClusterTest {
             rand.nextDouble(),
             VehicleStatus.Online,
             new JsObject(meta),
-            Option.apply(null)
+            Option.apply(null),
+            CLUSTER_ID
         );
     }
 
@@ -91,7 +82,8 @@ public class ClusterTest {
             rand.nextDouble(),
             CommodityStatus.Waiting,
             new JsObject(meta),
-            Option.apply(null)
+            Option.apply(null),
+            CLUSTER_ID
         );
     }
 
@@ -139,132 +131,118 @@ public class ClusterTest {
     @Test
     public void ebeanModelShouldBeValid() {
         createClusters();
-        assertEquals(5, Cluster.finder().all().size());
+        assertEquals(6, Cluster.finder().all().size()); // including the cluster in BaseAppTest
         assertEquals(3, Vehicle.finder().all().size());
         assertEquals(3, Commodity.finder().all().size());
     }
 
     @Test
     public void validPostShouldCreateClusterEasy() {
-        Helpers.running(fakeApp, () -> {
-            ObjectNode body = jsonNodeFactory.objectNode();
-            body.put("id", "main/subcluster");
-            RequestBuilder request = new RequestBuilder()
-                    .bodyJson(body)
-                    .header("Content-Type", "application/json")
-                    .method(Helpers.POST)
-                    .uri("/cluster");
+        ObjectNode body = jsonNodeFactory.objectNode();
+        body.put("id", "main/subcluster");
+        RequestBuilder request = new RequestBuilder()
+                .bodyJson(body)
+                .header("Content-Type", "application/json")
+                .method(Helpers.POST)
+                .uri("/cluster");
 
-            Result result = Helpers.route(request);
+        Result result = Helpers.route(request);
 
-            // Check for 'Created' Status Code
-            assertEquals(201, result.status());
+        // Check for 'Created' Status Code
+        assertEquals(201, result.status());
 
-            ObjectNode resultJson = (ObjectNode) bodyForResult(result);
+        ObjectNode resultJson = (ObjectNode) bodyForResult(result);
 
-            // Ensure that all fields were correctly written to the database
-            assertTrue("db record should have id", resultJson.hasNonNull("id"));
-
-        });
+        // Ensure that all fields were correctly written to the database
+        assertTrue("db record should have id", resultJson.hasNonNull("id"));
     }
 
     @Test
     public void validPostShouldCreateClusterHard() {
-        Helpers.running(fakeApp, () -> {
+        Cluster mainCluster = createClusters();
+        mainCluster.delete();
+        JsValue jsonCluster = Cluster.format().writes(mainCluster);
+        RequestBuilder request = new RequestBuilder()
+                .bodyJson(jsonCluster)
+                .header("Content-Type", "application/json")
+                .method(Helpers.POST)
+                .uri("/cluster");
 
-            Cluster mainCluster = createClusters();
-            mainCluster.delete();
-            JsValue jsonCluster = Cluster.format().writes(mainCluster);
-            RequestBuilder request = new RequestBuilder()
-                    .bodyJson(jsonCluster)
-                    .header("Content-Type", "application/json")
-                    .method(Helpers.POST)
-                    .uri("/cluster");
+        Result result = Helpers.route(request);
+        assertEquals(201, result.status());
 
-            Result result = Helpers.route(request);
-            assertEquals(201, result.status());
-
-            ObjectNode resultJson = (ObjectNode) bodyForResult(result);
-            assertTrue("db record should have vehicles", resultJson.hasNonNull("vehicles"));
-            assertTrue("db record should have commodities", resultJson.hasNonNull("commodities"));
-        });
+        ObjectNode resultJson = (ObjectNode) bodyForResult(result);
+        assertTrue("db record should have vehicles", resultJson.hasNonNull("vehicles"));
+        assertTrue("db record should have commodities", resultJson.hasNonNull("commodities"));
     }
 
     @Test
     public void getShouldReturnAllCluster() {
-        Helpers.running(fakeApp, () -> {
-            Cluster cluster = createClusters();
-            cluster.save();
+        Cluster cluster = createClusters();
+        cluster.save();
 
-            RequestBuilder request = new RequestBuilder()
-                    .method(Helpers.GET)
-                    .uri("/cluster");
-            Result result = Helpers.route(request);
+        RequestBuilder request = new RequestBuilder()
+                .method(Helpers.GET)
+                .uri("/cluster");
+        Result result = Helpers.route(request);
 
-            assertEquals("Get all clusters should return status 200", 200, result.status());
+        assertEquals("Get all clusters should return status 200", 200, result.status());
 
-            ArrayNode resultJson = (ArrayNode) bodyForResult(result);
-            assertEquals("Should have returned five clusters", 5, resultJson.size());
-        });
+        ArrayNode resultJson = (ArrayNode) bodyForResult(result);
+        assertEquals("Should have returned six clusters", 6, resultJson.size()); // includes cluster from BaseAppTest
     }
 
     @Test
     public void getByExistingIDShouldReturnCluster() {
-        Helpers.running(fakeApp, () -> {
-            String existingId = createClusters().id();
+        String existingId = createClusters().id();
 
-            RequestBuilder request = new RequestBuilder()
-                    .method(Helpers.GET)
-                    .uri("/cluster/"+existingId);
-            Result result = Helpers.route(request);
+        RequestBuilder request = new RequestBuilder()
+                .method(Helpers.GET)
+                .uri("/cluster/"+existingId);
+        Result result = Helpers.route(request);
 
-            assertEquals("Get cluster by id should return status 200", 200, result.status());
-            ObjectNode resultJson = (ObjectNode) bodyForResult(result);
-            Cluster cluster = Cluster.format().reads(play.api.libs.json.Json.parse(resultJson.toString())).get();
-            assertNotNull("Get by id should return a result", cluster);
-        });
+        assertEquals("Get cluster by id should return status 200", 200, result.status());
+        ObjectNode resultJson = (ObjectNode) bodyForResult(result);
+        Cluster cluster = Cluster.format().reads(play.api.libs.json.Json.parse(resultJson.toString())).get();
+        assertNotNull("Get by id should return a result", cluster);
     }
 
     @Test
     public void getByInvalidIdShouldReturnNotFound() {
-        Helpers.running(fakeApp, () -> {
-            createClusters();
+        createClusters();
 
-            RequestBuilder request = new RequestBuilder()
-                    .method(Helpers.GET)
-                    .uri("/cluster/1000");
-            Result result = Helpers.route(request);
+        RequestBuilder request = new RequestBuilder()
+                .method(Helpers.GET)
+                .uri("/cluster/1000");
+        Result result = Helpers.route(request);
 
-            assertEquals("Get by invalid should return status 404", 404, result.status());
-        });
+        assertEquals("Get by invalid should return status 404", 404, result.status());
     }
 
     @Test
     public void deleteShouldDeleteCluster() {
-        Helpers.running(fakeApp, () -> {
-            String existingId = createClusters().id();
+        String existingId = createClusters().id();
 
-            RequestBuilder deleteRequest = new RequestBuilder()
-                    .method(Helpers.DELETE)
-                    .uri("/cluster/" + existingId);
-            Result deleteResult = Helpers.route(deleteRequest);
+        RequestBuilder deleteRequest = new RequestBuilder()
+                .method(Helpers.DELETE)
+                .uri("/cluster/" + existingId);
+        Result deleteResult = Helpers.route(deleteRequest);
 
-            assertEquals("valid DELETE cluster request should return status 200", 200, deleteResult.status());
+        assertEquals("valid DELETE cluster request should return status 200", 200, deleteResult.status());
 
-            RequestBuilder getRequest = new RequestBuilder()
-                    .method(Helpers.GET)
-                    .uri("/cluster/" + existingId);
-            Result getResult = Helpers.route(getRequest);
+        RequestBuilder getRequest = new RequestBuilder()
+                .method(Helpers.GET)
+                .uri("/cluster/" + existingId);
+        Result getResult = Helpers.route(getRequest);
 
-            assertEquals("GET req for deleted cluster should 404", 404, getResult.status());
+        assertEquals("GET req for deleted cluster should 404", 404, getResult.status());
 
-            RequestBuilder deleteFakeRequest = new RequestBuilder()
-                    .method(Helpers.DELETE)
-                    .uri("/cluster/500");
-            Result deleteFakeResult = Helpers.route(deleteFakeRequest);
+        RequestBuilder deleteFakeRequest = new RequestBuilder()
+                .method(Helpers.DELETE)
+                .uri("/cluster/500");
+        Result deleteFakeResult = Helpers.route(deleteFakeRequest);
 
-            assertEquals("Deleting nonexistent cluster should return 404", 404, deleteFakeResult.status());
-        });
+        assertEquals("Deleting nonexistent cluster should return 404", 404, deleteFakeResult.status());
     }
 
 }

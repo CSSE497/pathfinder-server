@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import play.api.libs.json.JsNumber;
-import play.api.libs.json.JsObject;
 import play.api.libs.json.JsResult;
 import play.api.libs.json.Json;
 import scala.Option;
@@ -15,7 +14,15 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(JUnit4.class)
 public class VehicleTest extends BaseAppTest {
-    private final String JSON_VEHICLE = "{\"id\":1,\"latitude\":0.123,\"longitude\":4.567,\"metadata\":{\"capacity\":7},\"status\":\"Online\"}";
+    private final String JSON_VEHICLE = "{" +
+        "\"id\":1," +
+        "\"latitude\":0.123," +
+        "\"longitude\":4.567," +
+        "\"metadata\":{\"capacity\":7}," +
+        "\"status\":\"Online\"," +
+        "\"clusterId\":\""+CLUSTER_ID+"\"" +
+    "}";
+
     private final String JSON_PARTIAL_VEHICLE = "{\"latitude\":0.123,\"longitude\":4.567,\"metadata\":{\"capacity\":8}}";
 
     @Test
