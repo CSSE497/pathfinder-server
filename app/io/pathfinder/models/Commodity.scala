@@ -32,7 +32,7 @@ object Commodity {
         endLongitude: Option[Double],
         status: Option[CommodityStatus],
         metadata:  Option[JsObject],
-        clusterPath: Option[String],
+        clusterId: Option[String],
         vehicleId: Option[Long]
     ) extends Resource[Commodity] {
         override def update(c: Commodity): Option[Commodity] = {
