@@ -117,7 +117,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
 
     def clusterRouted(routes: Seq[Route]): Routed = Routed(
         ModelTypes.Cluster,
-        JsObject(Seq(("path",JsString(clusterPath)))),
+        JsObject(Seq(("id",JsString(clusterPath)))),
         Writes.seq(Route.writes).writes(routes)
     )
 
