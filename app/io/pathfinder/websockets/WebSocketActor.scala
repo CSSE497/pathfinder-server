@@ -49,12 +49,14 @@ class WebSocketActor (
                         client ! Error("id: "+id.toString+" not found for model: "+id.modelType.toString)
 
                 case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
+
                 case GetApplicationCluster(id) => client ! Option(Cluster.finder.byId(id.toString)).map { cluster =>
                     ApplicationCluster(id, Cluster.format.writes(cluster))
                 }.getOrElse{
                     Error("No Cluster with path: " + id.toString + " found")
                 }
-                case Subscribe(None, None, Some(id)) =>
+
+                case Subscribe(None, _model, Some(id)) =>
                     client ! {
                         id match {
                             case VehicleId(vId) =>
@@ -63,16 +65,22 @@ class WebSocketActor (
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).subscribeById(cId, client)
                                 Subscribed(None, None, Some(id))
+                            case ClusterPath(path) =>
+                                observers.values.foreach(_.subscribeByClusterPath(path, client))
+                                Subscribed(Some(path), None, Some(id))
                             case _Else => Error("Only subscriptions to vehicles and commodities are supported")
                         }
                     }
+
+                case Subscribe(Some(path), None, None) =>
+                    observers.values.foreach(_.subscribeByClusterPath(path, client))
+                    client ! Subscribed(Some(path), None, Some(ClusterPath(path)))
 
                 case Subscribe(Some(path), Some(modelType), None) =>
                     client ! observers.get(modelType).map{ obs =>
                         obs.subscribeByClusterPath(path, client)
                         Subscribed(Some(path), Some(modelType), None)
                     }.getOrElse(Error("Subscriptions to clusters by cluster not supported"))
-
 
                 // unsubscribe from everything
                 case Unsubscribe(None, None, None) =>
@@ -110,8 +118,10 @@ class WebSocketActor (
                     }
                 case u: Unsubscribe =>
                     client ! Error("An unsubscribe message must either have a model id and model type, cluster id and model type, a cluster id, or be empty")
+
                 case UnknownMessage(value) => client ! Error("Received unknown message: " + value.toString)
-                case x => client ! Error("received unknown value: "+ x.toString)
+
+                case x => client ! Error("received unhandled message: "+ x.toString)
             }
         }.recover{ case e =>
             e.printStackTrace()
