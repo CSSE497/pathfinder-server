@@ -7,14 +7,14 @@ import com.avaje.ebean.Model
 import com.avaje.ebean.annotation.Transactional
 import io.pathfinder.data.{EbeanCrudDao, Resource}
 import play.api.libs.json.{Json, Format}
-import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListConverter}
+import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListConverter, asScalaIteratorConverter}
 import scala.collection.{mutable, Iterator}
 
 object Cluster {
     val finder: Model.Find[String, Cluster] = new Model.Finder[String, Cluster](classOf[Cluster])
 
-    def byPrefix(path: String): Seq[Cluster] =
-        finder.query().where().startsWith("id", path).findList().asScala
+    def byPrefix(path: String): Iterator[Cluster] =
+        finder.query().where().startsWith("id", path).findIterate().asScala
 
     object Dao extends EbeanCrudDao[String, Cluster](finder)
 
@@ -77,7 +77,7 @@ object Cluster {
     }
 
     def unapply(c: Cluster): Option[(String, Seq[Vehicle], Seq[Commodity], Seq[Cluster])] =
-        Some((c.id, c.vehicles, c.commodities, c.subClusters))
+        Some((c.id, c.vehicles, c.commodities, c.subClusters.toSeq))
 }
 
 
@@ -97,7 +97,7 @@ class Cluster() extends Model {
 
     def commodities: Seq[Commodity] = commodityList.asScala
 
-    def subClusters: Seq[Cluster] = Cluster.byPrefix(id+"/")
+    def subClusters: Iterator[Cluster] = descendants.filter(_.id.count(_ == '/') == id.count(_ == '/') + 1)
 
     @Transient
     private val unsavedSubclusters: mutable.Buffer[Cluster] = mutable.Buffer.empty
@@ -111,8 +111,7 @@ class Cluster() extends Model {
             _.flatMap(_.parent)
         ).takeWhile(_.isDefined).map(_.get)
 
-    def descendants: Iterator[Cluster] =             // each level            // combine all the levels
-        Iterator.iterate(subClusters.iterator)(_.map(_.subClusters).flatten).takeWhile(_.hasNext).flatten
+    def descendants: Iterator[Cluster] = Cluster.byPrefix(id +"/")
 
     def application: Application =
         Application.finder.byId(id.iterator.takeWhile(_ != '/').mkString)
