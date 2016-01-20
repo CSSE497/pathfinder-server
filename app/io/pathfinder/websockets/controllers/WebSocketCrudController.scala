@@ -42,12 +42,12 @@ abstract class WebSocketCrudController[K,V <: ebean.Model](
             case Delete(id) => Some(
                 dao.delete(id.id.asInstanceOf[K]).map(
                     m => Deleted(model,writes.writes(m))
-                )  getOrElse Error("Could not delete "+model+" with id "+id)
+                )  getOrElse Error("Could not delete "+model+" with id "+id+", does this id exist?")
             )
             case Read(id) => Some(
                 dao.read(id.id.asInstanceOf[K]).map(
                     m => Model(model,writes.writes(m))
-                ) getOrElse Error("Could not delete "+model+" with id "+id)
+                ) getOrElse Error("Could not read "+model+" with id "+id+", does this id exist?")
             )
             case x: WebSocketMessage => Some(Error("No support for message: " + WebSocketMessage.format.writes(x) + " for model: "+model.toString))
         }
