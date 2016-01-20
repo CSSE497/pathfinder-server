@@ -18,6 +18,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.1" % "test",
   "org.scalatestplus" %% "play" % "1.4.0-M3" % "test",
   "org.postgresql" % "postgresql" % "9.4-1203-jdbc42",
+  "com.jolbox" % "bonecp" % "0.8.0.RELEASE",
   "com.typesafe.akka" %% "akka-testkit" % "2.4.1",
   "com.typesafe.akka" %% "akka-slf4j" % "2.4.1"
 )
