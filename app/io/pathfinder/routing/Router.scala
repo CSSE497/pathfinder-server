@@ -26,22 +26,24 @@ object Router extends ActorEventBus with SubchannelClassification {
     override type Subscriber = ActorRef
 
     // SubchannelClassification is retarded and didn't provide a way to view the current subscriptions
-    protected val subs: mutable.Set[String] = new mutable.HashSet[String] {
-        override def add(elem: String): Boolean = {
-            subscribe(
-                Global.actorSystem.actorOf(ClusterRouter.props(elem), elem),
-                elem
-            )
-            super.add(elem)
-        }
 
-        override def remove(elem: String): Boolean = {
-            Global.actorSystem.actorSelection(elem).resolveOne()(Timeout(FiniteDuration(2, TimeUnit.SECONDS))).onComplete{
-                t => t.map(unsubscribe).getOrElse(Logger.warn("ClusterRouter Actor for "+ elem +" not found"))
-            }
-            super.remove(elem)
+    private def add(path: String): Boolean = {
+        val ref = Global.actorSystem.actorOf(ClusterRouter.props(path))
+        if(subscribe(ref, path)){
+            subs.put(path, ref)
+            true
+        } else {
+            false
         }
     }
+
+    private def remove(path: String): Boolean = {
+        val ref = subs.get(path).orElse(return false).get
+        unsubscribe(ref)
+        true
+    }
+
+    protected val subs: mutable.Map[String, ActorRef] = new mutable.HashMap[String, ActorRef]
 
     override protected val subclassification = new Subclassification[Classifier] {
         override def isEqual(x: String, y: String): Boolean = x.equals(y)
@@ -65,7 +67,7 @@ object Router extends ActorEventBus with SubchannelClassification {
                 Cluster.Dao.read(path).getOrElse(return false)
         }
         if(!subs.contains(cluster.id)){
-            subs.add(cluster.id)
+            add(cluster.id)
         }
         publish((cluster.id, Subscribe(client, id)))
         publish(cluster, RouteRequest(client, id))
