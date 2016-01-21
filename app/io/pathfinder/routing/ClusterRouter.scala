@@ -277,8 +277,8 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num + 2 * commodities.size + 1)))
             val capacities = JsObject(cluster.application.capacityParameters.map { p =>
                 p.parameter -> JsObject(
-                    commodities.zipWithIndex.foldLeft(Seq.empty[(String,JsValue)]) {
-                        case (seq: Seq[(String,JsValue)], (com, i)) =>
+                    commodities.zipWithIndex.foldLeft(Seq.empty[(String, JsValue)]) {
+                        case (seq, (com, i)) =>
                             val cap = com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
                             seq :+ (i + 1).toString -> cap :+ (i + 1 + commodities.size + 1).toString -> JsNumber(-cap.value)
                     } ++ vehicles.zipWithIndex.map {
@@ -310,6 +310,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 "capacities" -> capacities,
                 "distances" -> makeMatrix(
                     startToPickUpDist,
+                    startToDropOffDist,
                     pickUpToDropOffDist,
                     pickUpToPickUpDist,
                     dropOffToPickUpDist,
@@ -317,6 +318,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 ),
                 "durations" -> makeMatrix(
                     startToPickUpDur,
+                    startToDropOffDur,
                     pickUpToDropOffDur,
                     pickUpToPickUpDur,
                     dropOffToPickUpDur,
