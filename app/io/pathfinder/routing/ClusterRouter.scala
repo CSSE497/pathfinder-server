@@ -243,9 +243,27 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         val starts = vehicles.map(x => (x.latitude, x.longitude))
         val pickups = commodities.map(c => (c.startLatitude, c.startLongitude))
         val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
+        val inVehicles = commodities.map(c => c.vehicle != null)
         val body: Future[JsValue] = for {
             (startToPickUpDist, startToPickUpDur) <- DistanceFinder.find(starts, pickups)
-            (startToDropOffDist, startToDropOffDur) <- DistanceFinder.find(starts, dropOffs)
+            (startToDropOffDist, startToDropOffDur) <- for {
+                (dist, dur) <- DistanceFinder.find(
+                    starts,
+                    dropOffs.zip(inVehicles).filter(_._2).map(_._1)
+                )
+            } yield {
+                def addZeros(startToDrop: Matrix): Matrix = {
+                    startToDrop.map {
+                        row =>
+                            val iter = row.iterator
+                            inVehicles.map[Int,Array[Int]] {
+                                case true => iter.next()
+                                case false => 0
+                            }
+                    }
+                }
+                (addZeros(dist), addZeros(dur))
+            }
             (pickUpToDropOffDist, pickUpToDropOffDur) <- DistanceFinder.find(pickups, dropOffs)
             (pickUpToPickUpDist, pickUpToPickUpDur) <- DistanceFinder.find(pickups, pickups)
             (dropOffToPickUpDist, dropOffToPickUpDur) <- DistanceFinder.find(dropOffs, pickups)
