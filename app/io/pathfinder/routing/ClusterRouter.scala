@@ -245,6 +245,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
         val body: Future[JsValue] = for {
             (startToPickUpDist, startToPickUpDur) <- DistanceFinder.find(starts, pickups)
+            (startToDropOffDist, startToDropOffDur) <- DistanceFinder.find(starts, dropOffs)
             (pickUpToDropOffDist, pickUpToDropOffDur) <- DistanceFinder.find(pickups, dropOffs)
             (pickUpToPickUpDist, pickUpToPickUpDur) <- DistanceFinder.find(pickups, pickups)
             (dropOffToPickUpDist, dropOffToPickUpDur) <- DistanceFinder.find(dropOffs, pickups)
@@ -252,6 +253,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         } yield {
             def makeMatrix(
                 startsToPickUps: Matrix,
+                startsToDropOffs: Matrix,
                 pickUpsToDropOffs: Matrix,
                 pickUpsToPickUps: Matrix,
                 dropOffsToPickUps: Matrix,
@@ -261,21 +263,25 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                   tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
               ) ++ dropOffsToPickUps.zip(dropOffsToDropOffs).map(
                   tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
-              ) ++ startsToPickUps.map(
-                  _ ++ Seq.fill(commodities.size + vehicles.size)(0)
+              ) ++ startsToPickUps.zip(startsToDropOffs).map(
+                  tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
               )).map(row => JsArray(row.map(JsNumber(_))))
             )
 
-            val comTable = JsObject(commodities.indices.map(num => ((num + 1).toString, JsNumber(num + commodities.size + 1))))
+            val comTable = JsObject(commodities.indices.map{ num =>
+                (
+                  (num + commodities.size + 1).toString,
+                  JsNumber(if(commodities(num).vehicle == null) num + 1 else num + 2 * commodities.size + 1)
+                )
+            })
             val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num + 2 * commodities.size + 1)))
             val capacities = JsObject(cluster.application.capacityParameters.map { p =>
                 p.parameter -> JsObject(
-                    commodities.zipWithIndex.map {
-                        case (com, i) =>
-                            (i + 1).toString ->
-                                com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
-                    } ++
-                    vehicles.zipWithIndex.map {
+                    commodities.zipWithIndex.foldLeft(Seq.empty[(String,JsValue)]) {
+                        case (seq: Seq[(String,JsValue)], (com, i)) =>
+                            val cap = com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
+                            seq :+ (i + 1).toString -> cap :+ (i + 1 + commodities.size + 1).toString -> JsNumber(-cap.value)
+                    } ++ vehicles.zipWithIndex.map {
                         case (veh, i) =>
                             (i + 1 + 2 * commodities.size).toString ->
                                 veh.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
