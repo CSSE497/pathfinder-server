@@ -42,6 +42,10 @@ class WebSocketActor (
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
             m match {
+                case Route(id) =>
+                    if(!Router.routeRequest(client, id)) {
+                        client ! Error("could not get route, could not find "+ id.modelType + " with id: " + id.id)
+                    }
                 case RouteSubscribe(id) =>
                     if(Router.subscribeToRoute(client, id))
                         client ! RouteSubscribed(id)
