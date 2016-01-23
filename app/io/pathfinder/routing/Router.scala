@@ -55,21 +55,32 @@ object Router extends ActorEventBus with SubchannelClassification {
 
     override protected def publish(event: Event, subscriber: ActorRef): Unit = subscriber ! event._2
 
+    private def clusterFromId(id: ModelId): Option[Cluster] = id match {
+        case ModelId.VehicleId(vId) =>
+            Vehicle.Dao.read(vId).map(_.cluster)
+        case ModelId.CommodityId(cId) =>
+            Commodity.Dao.read(cId).map(_.cluster)
+        case ModelId.ClusterPath(path) =>
+            Cluster.Dao.read(path)
+    }
+
     def subscribeToRoute(client: ActorRef, id: ModelId): Boolean = {
         implicit val timeout = Timeout(2.seconds) // used for the recalculation futures used right below
 
-        val cluster = id match {
-            case ModelId.VehicleId(vId) =>
-                Vehicle.Dao.read(vId).getOrElse(return false).cluster
-            case ModelId.CommodityId(cId) =>
-                Commodity.Dao.read(cId).getOrElse(return false).cluster
-            case ModelId.ClusterPath(path) =>
-                Cluster.Dao.read(path).getOrElse(return false)
-        }
+        val cluster = clusterFromId(id).getOrElse(return false)
         if(!subs.contains(cluster.id)){
             add(cluster.id)
         }
         publish((cluster.id, Subscribe(client, id)))
+        publish(cluster, RouteRequest(client, id))
+        true
+    }
+
+    def routeRequest(client: ActorRef, id: ModelId): Boolean = {
+        val cluster = clusterFromId(id).getOrElse(return false)
+        if(!subs.contains(cluster.id)){
+            add(cluster.id)
+        }
         publish(cluster, RouteRequest(client, id))
         true
     }

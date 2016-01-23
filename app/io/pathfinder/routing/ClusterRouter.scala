@@ -25,8 +25,8 @@ import scala.util.{Failure, Success, Try}
 
 object ClusterRouter {
 
-    type Row = Array[Int]
-    type Matrix = Array[Row]
+    type Row = Seq[Int]
+    type Matrix = Seq[Row]
 
     val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
         throw new scala.Error("routing.server not defined in application.conf, routing will not work")
@@ -57,8 +57,8 @@ object ClusterRouter {
             None
         }
 
-        def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] =
-            apiKey.fold{
+        def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] = {
+            val req = apiKey.fold {
                 googleMaps.withQueryString(
                     "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
                     "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"))
@@ -67,13 +67,16 @@ object ClusterRouter {
                     "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
                     "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
                     "key" -> key)
-            }.get()
+            }
+            Logger.info(req.toString)
+            req.get()
+        }
 
         def parseResponse(res: WSResponse): Try[(Matrix,Matrix)] = Try(
             res.json.validate(
-                (__ \ "rows").read[Array[JsValue]].map(
+                (__ \ "rows").read[Seq[JsValue]].map(
                     _.map(_.validate(
-                        (__ \ "elements").read[Array[JsValue]].map(
+                        (__ \ "elements").read[Seq[JsValue]].map(
                             _.map(
                                 _.validate(
                                     (__ \ "distance" \ "value").read[Int] and
@@ -88,7 +91,9 @@ object ClusterRouter {
         )
 
         def find(origins: Seq[(Double, Double)], dests: Seq[(Double, Double)]): Future[(Matrix,Matrix)] =
-            makeRequest(origins, dests).map{ resp =>
+            if(origins.isEmpty || dests.isEmpty)
+                Future.successful((Seq.empty, Seq.empty))
+            else makeRequest(origins, dests).map{ resp =>
                 Logger.info(resp.body)
                 resp
             }.map(parseResponse).flatMap(
@@ -196,7 +201,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         case _Else => super.receive(_Else)
     }
 
-    val matrixWriter: Writes[Matrix] = Writes.arrayWrites[Row]//Json.writes[Array[Array[Double]]]
+    val matrixWriter: Writes[Matrix] = Writes.seq[Row] //Json.writes[Array[Array[Double]]]
 
     def parseRoutingResponse(vehicles: Seq[Vehicle], commodities: Seq[Commodity], result: WSResponse): Try[Seq[Route]] =
         result.json.validate(
@@ -245,6 +250,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         val dropOffs = commodities.map(c => (c.endLatitude, c.endLongitude))
         val body: Future[JsValue] = for {
             (startToPickUpDist, startToPickUpDur) <- DistanceFinder.find(starts, pickups)
+            (startToDropOffDist, startToDropOffDur) <- DistanceFinder.find(starts, dropOffs)
             (pickUpToDropOffDist, pickUpToDropOffDur) <- DistanceFinder.find(pickups, dropOffs)
             (pickUpToPickUpDist, pickUpToPickUpDur) <- DistanceFinder.find(pickups, pickups)
             (dropOffToPickUpDist, dropOffToPickUpDur) <- DistanceFinder.find(dropOffs, pickups)
@@ -252,6 +258,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         } yield {
             def makeMatrix(
                 startsToPickUps: Matrix,
+                startsToDropOffs: Matrix,
                 pickUpsToDropOffs: Matrix,
                 pickUpsToPickUps: Matrix,
                 dropOffsToPickUps: Matrix,
@@ -261,21 +268,29 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                   tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
               ) ++ dropOffsToPickUps.zip(dropOffsToDropOffs).map(
                   tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
-              ) ++ startsToPickUps.map(
-                  _ ++ Seq.fill(commodities.size + vehicles.size)(0)
+              ) ++ startsToPickUps.zip(startsToDropOffs).map(
+                  tup => tup._1 ++ tup._2 ++ Seq.fill(vehicles.size)(0)
               )).map(row => JsArray(row.map(JsNumber(_))))
             )
 
-            val comTable = JsObject(commodities.indices.map(num => ((num + 1).toString, JsNumber(num + commodities.size + 1))))
             val vehicleTable = JsArray(vehicles.indices.map(num => JsNumber(num + 2 * commodities.size + 1)))
+            val comTable = JsObject(commodities.indices.map{ num =>
+                (
+                    (num + commodities.size + 1).toString,
+                    JsNumber(BigDecimal(
+                        Option(commodities(num).vehicle).map { vehicle =>
+                            vehicles.zipWithIndex.find(kv => kv._1.id == vehicle.id).get._2 + 2 * commodities.size + 1
+                        } getOrElse (num + 1)
+                    ))
+                )
+            })
             val capacities = JsObject(cluster.application.capacityParameters.map { p =>
                 p.parameter -> JsObject(
-                    commodities.zipWithIndex.map {
-                        case (com, i) =>
-                            (i + 1).toString ->
-                                com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
-                    } ++
-                    vehicles.zipWithIndex.map {
+                    commodities.zipWithIndex.foldLeft(Seq.empty[(String, JsValue)]) {
+                        case (seq, (com, i)) =>
+                            val cap = com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
+                            seq :+ (i + 1).toString -> cap :+ (i + 1 + commodities.size + 1).toString -> JsNumber(-cap.value)
+                    } ++ vehicles.zipWithIndex.map {
                         case (veh, i) =>
                             (i + 1 + 2 * commodities.size).toString ->
                                 veh.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
@@ -298,12 +313,16 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 )
             })
             Logger.info("Parameters: " + parameters)
+            val fun = cluster.application.objectiveFunction
+            fun.refresh()
+            Logger.info("Objective Function : "+fun.id+" : "+fun.function)
             JsObject(Seq(
                 "commodities" -> comTable,
                 "vehicles" -> vehicleTable,
                 "capacities" -> capacities,
                 "distances" -> makeMatrix(
                     startToPickUpDist,
+                    startToDropOffDist,
                     pickUpToDropOffDist,
                     pickUpToPickUpDist,
                     dropOffToPickUpDist,
@@ -311,13 +330,14 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 ),
                 "durations" -> makeMatrix(
                     startToPickUpDur,
+                    startToDropOffDur,
                     pickUpToDropOffDur,
                     pickUpToPickUpDur,
                     dropOffToPickUpDur,
                     dropOffToDropOffDur
                 ),
                 "parameters" -> parameters,
-                "objective" -> JsString(cluster.application.objectiveFunction.function)
+                "objective" -> JsString(fun.function)
             ))
         }
         body.recoverWith[JsValue]{
@@ -325,7 +345,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 Logger.error("Failed to request and receive route data from google maps api", t)
                 Future.failed(t)
         }.flatMap[WSResponse]{ json =>
-            Logger.info("Sending message: " + body)
+            Logger.info("Sending message: " + json)
             routingServer.post(
                 json
             ).map{ response =>
