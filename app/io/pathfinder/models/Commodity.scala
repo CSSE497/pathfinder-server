@@ -47,9 +47,10 @@ object Commodity {
                     c.status = newStatus
                     if (c.status.equals(CommodityStatus.PickedUp)) {
                         vehicleId.orElse(return None).foreach { id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None) }
-                    } else if (CommodityStatus.Waiting.equals(newStatus)) {
-                        c.requestTime = new Date
                     } else {
+                        if (CommodityStatus.Waiting.equals(newStatus)) {
+                            c.requestTime = new Date
+                        }
                         c.vehicle = null // don't know what should happen here
                     }
             }
