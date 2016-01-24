@@ -1,5 +1,6 @@
 package io.pathfinder.models
 
+import java.util.Date
 import javax.persistence.{GenerationType, Column, Id, Entity, GeneratedValue, JoinColumn, ManyToOne}
 
 import com.avaje.ebean.Model
@@ -7,7 +8,6 @@ import com.avaje.ebean.Model
 import io.pathfinder.data.Resource
 import io.pathfinder.websockets.ModelTypes
 import io.pathfinder.websockets.pushing.WebSocketDao
-import play.Logger
 
 import play.api.libs.json.{JsObject, Writes, Json, Format}
 
@@ -42,11 +42,13 @@ object Commodity {
             endLatitude.foreach(c.endLatitude = _)
             endLongitude.foreach(c.endLongitude = _)
             metadata.foreach(c.metadata  = _)
-            status.foreach{
+            status.foreach {
                 newStatus =>
                     c.status = newStatus
-                    if(c.status.equals(CommodityStatus.PickedUp)) {
+                    if (c.status.equals(CommodityStatus.PickedUp)) {
                         vehicleId.orElse(return None).foreach { id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None) }
+                    } else if (CommodityStatus.Waiting.equals(newStatus)) {
+                        c.requestTime = new Date
                     } else {
                         c.vehicle = null // don't know what should happen here
                     }
@@ -61,7 +63,6 @@ object Commodity {
                 endLongitude <- endLongitude
             } yield {
                 val stat = status.getOrElse(CommodityStatus.Inactive)
-                Logger.info(stat.toString)
                 val c = Commodity(
                     0,
                     startLatitude,
@@ -74,6 +75,9 @@ object Commodity {
                     cluster.id
                 )
                 c.cluster = cluster
+                if(CommodityStatus.Waiting.equals(stat)) {
+                    c.requestTime = new Date
+                }
                 c
             }
 
@@ -161,4 +165,7 @@ class Commodity() extends Model with HasId with HasCluster {
     @JoinColumn
     @ManyToOne
     var cluster: Cluster = null
+
+    @Column
+    var requestTime: Date = new Date(0)
 }
