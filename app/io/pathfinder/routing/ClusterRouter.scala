@@ -28,6 +28,9 @@ object ClusterRouter {
     type Row = Seq[Int]
     type Matrix = Seq[Row]
 
+    protected val ZERO = BigDecimal(0)
+    protected implicit val BigDecimalReads = Reads.JsNumberReads.map(_.value)
+
     val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
         throw new scala.Error("routing.server not defined in application.conf, routing will not work")
     )).withHeaders(
@@ -103,6 +106,7 @@ object ClusterRouter {
 }
 
 class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBus with LookupClassification {
+    import ClusterRouter._
 
     private var cachedRoutes: Option[Seq[Route]] = None
 
@@ -288,24 +292,33 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 p.parameter -> JsObject(
                     commodities.zipWithIndex.foldLeft(Seq.empty[(String, JsValue)]) {
                         case (seq, (com, i)) =>
-                            val cap = com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
-                            seq :+ (i + 1).toString -> cap :+ (i + 1 + commodities.size + 1).toString -> JsNumber(-cap.value)
+                            val cap = com.metadata.validate((__ \ p.parameter).read(BigDecimalReads)).getOrElse(ZERO)
+                            seq :+ (i + 1).toString -> JsNumber(cap) :+
+                                   (i + 1 + commodities.size).toString -> JsNumber(-cap)
                     } ++ vehicles.zipWithIndex.map {
                         case (veh, i) =>
-                            (i + 1 + 2 * commodities.size).toString ->
-                                veh.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
+                            (i + 1 + 2 * commodities.size).toString -> JsNumber(
+                                veh.metadata.validate(
+                                    (__ \ p.parameter).read(BigDecimalReads)
+                                ).getOrElse(
+                                    BigDecimal(Integer.MAX_VALUE)
+                                ) - veh.commodities.map(
+                                    _.metadata.validate((__ \ p.parameter).read[JsNumber].map(_.value)).getOrElse(ZERO)
+                                ).reduceOption(_+_).getOrElse(ZERO)
+                            )
                     }
                 )
             })
             Logger.info("Capacities: " + capacities)
             val parameters = JsObject(cluster.application.objectiveParameters.map { p =>
                 p.parameter -> JsObject(
-                    commodities.zipWithIndex.map {
-                        case (com, i) =>
-                            (i + 1).toString ->
-                                com.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(0))
-                    } ++
-                    vehicles.zipWithIndex.map {
+                    commodities.zipWithIndex.foldLeft(Seq.empty[(String,JsValue)]) {
+                        case (seq, (com, i)) =>
+                            val par = com.metadata.validate(
+                                (__ \ p.parameter).read[JsNumber]
+                            ).getOrElse(JsNumber(0))
+                            seq :+ (i + 1).toString -> par :+ (i + 1 + commodities.size).toString -> par
+                    } ++ vehicles.zipWithIndex.map {
                         case (veh, i) =>
                             (i + 1 + 2 * commodities.size).toString ->
                                 veh.metadata.validate((__ \ p.parameter).read[JsNumber]).getOrElse(JsNumber(Integer.MAX_VALUE))
