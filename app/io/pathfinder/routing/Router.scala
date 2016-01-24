@@ -26,15 +26,21 @@ object Router extends ActorEventBus with SubchannelClassification {
     override type Subscriber = ActorRef
 
     // SubchannelClassification is retarded and didn't provide a way to view the current subscriptions
-
     private def add(path: String): Boolean = {
-        val ref = Global.actorSystem.actorOf(ClusterRouter.props(path))
-        if(subscribe(ref, path)){
-            subs.put(path, ref)
-            true
-        } else {
-            false
+        val clusters = Cluster.byPrefix(path)
+        clusters.foreach { c =>
+            if(!subs.contains(c.id)) {
+                val ref = Global.actorSystem.actorOf(ClusterRouter.props(c))
+                if (subscribe(ref, c.id)) {
+                    subs.put(c.id, ref)
+                } else {
+                    Global.actorSystem.stop(ref)
+                    Logger.warn("Failed to subscribe cluster router to cluster: " + c.id)
+                    return false
+                }
+            }
         }
+        true
     }
 
     private def remove(path: String): Boolean = {
