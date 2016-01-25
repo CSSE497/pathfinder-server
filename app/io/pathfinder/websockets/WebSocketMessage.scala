@@ -1,9 +1,10 @@
 package io.pathfinder.websockets
 
 import io.pathfinder.models.ModelId
+import io.pathfinder.models.ModelId.ClusterPath
 import io.pathfinder.websockets.WebSocketMessage.MessageCompanion
 import play.Logger
-import play.api.libs.json.{Writes, Reads, JsSuccess, JsResult, Format, Json, JsValue, __}
+import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.mvc.WebSocket.FrameFormatter
 import play.api.libs.functional.syntax._
 import scala.language.postfixOps
@@ -12,16 +13,22 @@ import scala.language.postfixOps
  * Contains all of the web socket messages and their json formats
  */
 sealed abstract class WebSocketMessage {
-    def companion: MessageCompanion[_] // I can't compile using this.type here
+    protected type M >: this.type <: WebSocketMessage
+
+    def companion: MessageCompanion[M]
+
     def message: String = companion.message
 
-    // this caste is her because scala is dumb (see above) and this is the easiest way around it
-    def toJson: JsValue = companion.format.asInstanceOf[Format[this.type]].writes(this)
+    def withApp(app: String): Option[M] = Some(this.asInstanceOf[M])
+
+    def toJson: JsValue = companion.format.writes(this.asInstanceOf[M])
 }
 
 object WebSocketMessage {
     import ModelTypes.{ModelType, format => modelFormat}
     import Events.{Event, format => eventFormat}
+
+    private val ROOT: String = "/root"
 
     private val builder = Map.newBuilder[String, MessageCompanion[_ <: WebSocketMessage]]
 
@@ -32,22 +39,46 @@ object WebSocketMessage {
 
     private def addComp(comp: MessageCompanion[_ <: WebSocketMessage]) = builder += comp.message -> comp
 
+    private def normalizeClusterPath(path: String, app: String): Option[String] = if (path.startsWith(ROOT)) {
+        if (path.length > 5)
+            Some(app + path.substring(5))
+        else
+            Some(app)
+    } else None
+
+    private def setIdApp(id: ModelId, app: String): Option[ModelId] = id match {
+        case ClusterPath(path) => normalizeClusterPath(path, app).map(ClusterPath.apply)
+        case modelId => Some(modelId)
+    }
+
     /**
      * These messages are routed to controllers based on the model they contain
      */
     sealed abstract class ControllerMessage extends WebSocketMessage {
+        override type M >: this.type <: ControllerMessage
         def model: ModelType
     }
 
     sealed abstract class ModelMessage extends ControllerMessage {
+        override type M >: this.type <: ModelMessage
         def id: ModelId
         override def model = id.modelType
+        override def withApp(app: String): Option[M] = setIdApp(id, app).map(withId)
+        protected def withId(id: ModelId): M
     }
 
     sealed abstract class SubscriptionMessage extends WebSocketMessage {
+        override type M >: this.type <: SubscriptionMessage
         def clusterId: Option[String]
         def model: Option[ModelType]
         def id: Option[ModelId]
+        override def withApp(app: String): Option[M] = Some(
+            withClusterAndId(
+                clusterId.map(normalizeClusterPath(_, app).getOrElse(return None)),
+                id.map(setIdApp(_, app).getOrElse(return None))
+            )
+        )
+        protected def withClusterAndId(clusterId: Option[String], id: Option[ModelId]): M
     }
 
     private def simpleModelMessageFormat[M <: ModelMessage](makeMessage: ModelId => M): Format[M] = {
@@ -80,6 +111,7 @@ object WebSocketMessage {
      * Standard error messages sent to client that make poor request
      */
     case class Error(error: String) extends WebSocketMessage {
+        override type M = Error
         override def companion = Error
     }
 
@@ -90,6 +122,7 @@ object WebSocketMessage {
     addComp(Error)
 
     case class UnknownMessage(value: JsValue) extends WebSocketMessage {
+        override type M = UnknownMessage
         override def companion = UnknownMessage
     }
 
@@ -110,7 +143,10 @@ object WebSocketMessage {
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
+        override type M = Unsubscribe
         override def companion = Unsubscribe
+        override def withClusterAndId(clusterId: Option[String], id: Option[ModelId]) =
+            copy(clusterId = clusterId, id = id)
     }
 
     object Unsubscribe extends MessageCompanion[Unsubscribe] {
@@ -127,7 +163,10 @@ object WebSocketMessage {
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
+        override type M = Subscribe
         override def companion = Subscribe
+        override def withClusterAndId(clusterId: Option[String], id: Option[ModelId]): M =
+            copy(clusterId = clusterId, id = id)
     }
 
     object Subscribe extends MessageCompanion[Subscribe] {
@@ -142,7 +181,9 @@ object WebSocketMessage {
     case class RouteSubscribe(
         id: ModelId
     ) extends ModelMessage {
+        override type M = RouteSubscribe
         override def companion = RouteSubscribe
+        override def withId(id: ModelId): RouteSubscribe = copy(id = id)
     }
 
     object RouteSubscribe extends MessageCompanion[RouteSubscribe] {
@@ -157,7 +198,9 @@ object WebSocketMessage {
     case class RouteUnsubscribe(
         id: ModelId
     ) extends ModelMessage {
+        override type M = RouteUnsubscribe
         override def companion = RouteUnsubscribe
+        override def withId(id: ModelId): RouteUnsubscribe = copy(id = id)
     }
 
     object RouteUnsubscribe extends MessageCompanion[RouteUnsubscribe] {
@@ -169,7 +212,9 @@ object WebSocketMessage {
     case class RouteSubscribed(
         id: ModelId
     ) extends ModelMessage {
+        override type M = RouteSubscribed
         override def companion = RouteSubscribed
+        override def withId(id: ModelId) = copy(id = id)
     }
 
     object RouteSubscribed extends MessageCompanion[RouteSubscribed] {
@@ -185,6 +230,7 @@ object WebSocketMessage {
         model: ModelType,
         value: JsValue
     ) extends ControllerMessage {
+        override type M = Create
         override def companion = Create
     }
 
@@ -201,7 +247,9 @@ object WebSocketMessage {
         id: ModelId,
         value: JsValue
     ) extends ModelMessage {
+        override type M = Update
         override def companion = Update
+        override def withId(id: ModelId) = copy(id = id)
     }
 
     object Update extends MessageCompanion[Update] {
@@ -224,7 +272,9 @@ object WebSocketMessage {
     case class Delete(
         id: ModelId
     ) extends ModelMessage {
+        override type M = Delete
         override def companion = Delete
+        override def withId(id: ModelId) = copy(id = id)
     }
 
     object Delete extends MessageCompanion[Delete] {
@@ -239,7 +289,9 @@ object WebSocketMessage {
     case class Route(
         id: ModelId
     ) extends ModelMessage {
+        override type M = Route
         override def companion = Route
+        override def withId(id: ModelId) = copy(id = id)
     }
 
     object Route extends MessageCompanion[Route] {
@@ -256,6 +308,7 @@ object WebSocketMessage {
         value: JsValue,
         route: JsValue
     ) extends ControllerMessage {
+        override type M = Routed
         override def companion = Routed
     }
 
@@ -271,7 +324,9 @@ object WebSocketMessage {
     case class Read(
         id: ModelId
     ) extends ModelMessage {
+        override type M = Read
         override def companion = Read
+        override protected def withId(id: ModelId): Read = copy(id = id)
     }
 
     object Read extends MessageCompanion[Read] {
@@ -286,7 +341,10 @@ object WebSocketMessage {
     case class GetApplicationCluster(
         id: String
     ) extends WebSocketMessage {
+        override type M = GetApplicationCluster
         override def companion = GetApplicationCluster
+        override def withApp(app: String): Option[GetApplicationCluster] =
+            normalizeClusterPath(id, app).map(path => copy(id = path))
     }
 
     object GetApplicationCluster extends MessageCompanion[GetApplicationCluster] {
@@ -299,7 +357,10 @@ object WebSocketMessage {
         id: String,
         value: JsValue
     ) extends WebSocketMessage {
+        override type M = ApplicationCluster
         override def companion = ApplicationCluster
+        override def withApp(app: String): Option[ApplicationCluster] =
+            normalizeClusterPath(id, app).map(path => copy(id = path))
     }
 
     object ApplicationCluster extends MessageCompanion[ApplicationCluster] {
@@ -315,6 +376,7 @@ object WebSocketMessage {
         model: ModelType,
         value: JsValue
     ) extends ControllerMessage {
+        override type M = Created
         override def companion = Created
     }
 
@@ -332,7 +394,8 @@ object WebSocketMessage {
         model: ModelType,
         value: JsValue
     ) extends ControllerMessage {
-      override def companion = Updated
+        override type M = Updated
+        override def companion = Updated
     }
 
     object Updated extends MessageCompanion[Updated] {
@@ -348,6 +411,7 @@ object WebSocketMessage {
         model: ModelType,
         value: JsValue
     ) extends ControllerMessage {
+        override type M = Model
         override def companion = Model
     }
 
@@ -364,6 +428,7 @@ object WebSocketMessage {
         model: ModelType,
         value: JsValue
     ) extends ControllerMessage {
+        override type M = Deleted
         override def companion = Deleted
     }
 
@@ -381,7 +446,10 @@ object WebSocketMessage {
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
+        override type M = Subscribed
         override def companion = Subscribed
+        override def withClusterAndId(clusterId: Option[String], id: Option[ModelId]): Subscribed =
+            copy(clusterId = clusterId, id = id)
     }
 
     object Subscribed extends MessageCompanion[Subscribed] {
@@ -398,7 +466,10 @@ object WebSocketMessage {
         model: Option[ModelType],
         id: Option[ModelId]
     ) extends SubscriptionMessage {
+        override type M = Unsubscribed
         override def companion = Unsubscribed
+        override def withClusterAndId(clusterId: Option[String], id: Option[ModelId]): Unsubscribed =
+            copy(clusterId = clusterId, id = id)
     }
 
     object Unsubscribed extends MessageCompanion[Unsubscribed] {

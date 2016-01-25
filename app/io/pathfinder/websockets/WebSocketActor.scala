@@ -26,7 +26,7 @@ object WebSocketActor {
         ModelTypes.Commodity -> Commodity.Dao
     )
 
-    def props(out: ActorRef) = Props(new WebSocketActor(out))
+    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app))
 }
 
 /**
@@ -34,14 +34,18 @@ object WebSocketActor {
  * to push notifications.
  */
 class WebSocketActor (
-    client: ActorRef
+    client: ActorRef,
+    app: String
 ) extends Actor {
     import WebSocketActor.{controllers, observers}
 
-    override def receive = {
+    override def receive: PartialFunction[Any, Unit] = {
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
-            m match {
+            m.withApp(app).getOrElse{
+                client ! Error("Unable to parse cluster id")
+                return PartialFunction.empty
+            } match {
                 case Route(id) =>
                     if(!Router.routeRequest(client, id)) {
                         client ! Error("could not get route, could not find "+ id.modelType + " with id: " + id.id)
