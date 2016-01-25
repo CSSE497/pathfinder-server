@@ -27,15 +27,17 @@ object Commodity {
 
     case class CommodityResource(
         id: Option[Long],
-        startLatitude:  Option[Double],
+        startLatitude: Option[Double],
         endLatitude: Option[Double],
-        startLongitude:  Option[Double],
+        startLongitude: Option[Double],
         endLongitude: Option[Double],
         status: Option[CommodityStatus],
-        metadata:  Option[JsObject],
+        metadata: Option[JsObject],
         clusterId: Option[String],
         vehicleId: Option[Long]
     ) extends Resource[Commodity] {
+        override type R = CommodityResource
+
         override def update(c: Commodity): Option[Commodity] = {
             startLatitude.foreach(c.startLatitude  = _)
             startLongitude.foreach(c.startLongitude = _)
@@ -87,6 +89,16 @@ object Commodity {
             cluster <- Cluster.Dao.read(id)
             model <- create(cluster)
         } yield model
+
+        override def withAppId(appId: String): Option[CommodityResource] = Some(
+            copy(
+                clusterId = clusterId.map(Cluster.addAppToPath(_, appId).getOrElse(return None))
+            )
+        )
+
+        override def withoutAppId: CommodityResource = copy(
+            clusterId = clusterId.map(Cluster.removeAppFromPath)
+        )
     }
 
     def apply(
@@ -129,7 +141,7 @@ object Commodity {
             c.status,
             c.metadata,
             Option(c.vehicle).map(_.id),
-            c.cluster.id
+            Cluster.removeAppFromPath(c.cluster.id)
         ))
 }
 

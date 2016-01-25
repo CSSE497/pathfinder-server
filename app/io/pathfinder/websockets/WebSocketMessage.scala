@@ -1,7 +1,6 @@
 package io.pathfinder.websockets
 
-import io.pathfinder.models.ModelId
-import io.pathfinder.models.ModelId.ClusterPath
+import io.pathfinder.models.{Cluster, ModelId}
 import io.pathfinder.websockets.WebSocketMessage.MessageCompanion
 import play.Logger
 import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
@@ -21,14 +20,14 @@ sealed abstract class WebSocketMessage {
 
     def withApp(app: String): Option[M] = Some(this.asInstanceOf[M])
 
+    def withoutApp: M = this.asInstanceOf[M]
+
     def toJson: JsValue = companion.format.writes(this.asInstanceOf[M])
 }
 
 object WebSocketMessage {
     import ModelTypes.{ModelType, format => modelFormat}
     import Events.{Event, format => eventFormat}
-
-    private val ROOT: String = "/root"
 
     private val builder = Map.newBuilder[String, MessageCompanion[_ <: WebSocketMessage]]
 
@@ -38,18 +37,6 @@ object WebSocketMessage {
     }
 
     private def addComp(comp: MessageCompanion[_ <: WebSocketMessage]) = builder += comp.message -> comp
-
-    private def normalizeClusterPath(path: String, app: String): Option[String] = if (path.startsWith(ROOT)) {
-        if (path.length > 5)
-            Some(app + path.substring(5))
-        else
-            Some(app)
-    } else None
-
-    private def setIdApp(id: ModelId, app: String): Option[ModelId] = id match {
-        case ClusterPath(path) => normalizeClusterPath(path, app).map(ClusterPath.apply)
-        case modelId => Some(modelId)
-    }
 
     /**
      * These messages are routed to controllers based on the model they contain
@@ -63,7 +50,8 @@ object WebSocketMessage {
         override type M >: this.type <: ModelMessage
         def id: ModelId
         override def model = id.modelType
-        override def withApp(app: String): Option[M] = setIdApp(id, app).map(withId)
+        override def withApp(app: String): Option[M] = id.withAppId(app).map(withId)
+        override def withoutApp: M = withId(id.withoutAppId)
         protected def withId(id: ModelId): M
     }
 
@@ -74,9 +62,13 @@ object WebSocketMessage {
         def id: Option[ModelId]
         override def withApp(app: String): Option[M] = Some(
             withClusterAndId(
-                clusterId.map(normalizeClusterPath(_, app).getOrElse(return None)),
-                id.map(setIdApp(_, app).getOrElse(return None))
+                clusterId.map(Cluster.addAppToPath(_, app).getOrElse(return None)),
+                id.map(_.withAppId(app).getOrElse(return None))
             )
+        )
+        override def withoutApp: M = withClusterAndId(
+            clusterId.map(Cluster.removeAppFromPath),
+            id.map(_.withoutAppId)
         )
         protected def withClusterAndId(clusterId: Option[String], id: Option[ModelId]): M
     }
@@ -344,7 +336,9 @@ object WebSocketMessage {
         override type M = GetApplicationCluster
         override def companion = GetApplicationCluster
         override def withApp(app: String): Option[GetApplicationCluster] =
-            normalizeClusterPath(id, app).map(path => copy(id = path))
+            Cluster.addAppToPath(id, app).map(path => copy(id = path))
+        override def withoutApp: GetApplicationCluster =
+            copy(id = Cluster.removeAppFromPath(id))
     }
 
     object GetApplicationCluster extends MessageCompanion[GetApplicationCluster] {
@@ -360,7 +354,9 @@ object WebSocketMessage {
         override type M = ApplicationCluster
         override def companion = ApplicationCluster
         override def withApp(app: String): Option[ApplicationCluster] =
-            normalizeClusterPath(id, app).map(path => copy(id = path))
+            Cluster.addAppToPath(id, app).map(path => copy(id = path))
+        override def withoutApp: ApplicationCluster =
+            copy(id = Cluster.removeAppFromPath(id))
     }
 
     object ApplicationCluster extends MessageCompanion[ApplicationCluster] {
@@ -481,6 +477,7 @@ object WebSocketMessage {
     val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
 
     Logger.info("stringToMessage: [" + stringToMessage.keys.mkString("|")+"]")
+
     /**
      * reads and writes WebSocketMessages from/to Json
      */

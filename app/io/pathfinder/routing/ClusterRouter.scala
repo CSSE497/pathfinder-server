@@ -176,9 +176,9 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 Future.failed(t)
         }.foreach( routes =>
             mId match {
-                case ModelId.ClusterPath(path) => client ! clusterRouted(routes)
+                case ModelId.ClusterPath(path) => client ! clusterRouted(routes).withoutApp
                 case ModelId.VehicleId(id) => routes.find(_.vehicle.id == id).foreach{ route =>
-                    client ! vehicleRouted(route)
+                    client ! vehicleRouted(route).withoutApp
                 }
                 case ModelId.CommodityId(id) =>
                     var commodity: Commodity = null
@@ -196,7 +196,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             ModelTypes.Commodity,
                             Commodity.format.writes(commodity),
                             Route.writes.writes(route)
-                        )
+                        ).withoutApp
                     }
             }
         )

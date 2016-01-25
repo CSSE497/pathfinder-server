@@ -11,6 +11,8 @@ import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListCon
 import scala.collection.{mutable, Iterator}
 
 object Cluster {
+    private val ROOT: String = "/root"
+
     val finder: Model.Find[String, Cluster] = new Model.Finder[String, Cluster](classOf[Cluster])
 
     def byPrefix(path: String): Iterator[Cluster] =
@@ -18,16 +20,33 @@ object Cluster {
 
     object Dao extends EbeanCrudDao[String, Cluster](finder)
 
+    def addAppToPath(path: String, app: String): Option[String] =
+        if (path.startsWith(ROOT)) {
+            Some(app + path.stripPrefix(ROOT))
+        } else None
+
+    def removeAppFromPath(path: String): String =
+        if(path.startsWith(ROOT)) {
+            path
+        } else {
+            val i = path.indexOf("/")
+            if(i == -1){
+                ROOT
+            } else {
+                ROOT + path.substring(i)
+            }
+        }
+
     implicit val format: Format[Cluster] = Json.format[Cluster]
     implicit val resourceFormat: Format[ClusterResource] = Json.format[ClusterResource]
 
     case class ClusterResource(
         id: Option[String],
-        name: Option[String],
         vehicles: Option[Seq[Vehicle.VehicleResource]],
         commodities: Option[Seq[Commodity.CommodityResource]],
         subClusters: Option[Seq[ClusterResource]]
     ) extends Resource[Cluster] {
+        override type R = ClusterResource
 
         override def update(model: Cluster): Option[Cluster] = None // Cluster Updates are not supported
 
@@ -57,14 +76,24 @@ object Cluster {
                     )
                 }
             )
-            subClusters.foreach(
-                _.foreach(
-                    sub =>
-                        sub.copy(id = sub.id.orElse(Some(id + "/" + sub.name.getOrElse(return None))))
-                )
-            )
             Some(model)
         }
+
+        override def withAppId(appId: String): Option[ClusterResource] = Some(
+            copy(
+                id.map(Cluster.addAppToPath(_, appId).getOrElse(return None)),
+                vehicles.map(_.map(_.withAppId(appId).getOrElse(return None))),
+                commodities.map(_.map(_.withAppId(appId).getOrElse(return None))),
+                subClusters.map(_.map(_.withAppId(appId).getOrElse(return None)))
+            )
+        )
+
+        override def withoutAppId: ClusterResource = copy(
+            id.map(Cluster.removeAppFromPath),
+            vehicles.map(_.map(_.withoutAppId)),
+            commodities.map(_.map(_.withoutAppId)),
+            subClusters.map(_.map(_.withoutAppId))
+        )
     }
 
     def apply(id: String, vehicles: Seq[Vehicle], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
@@ -77,7 +106,7 @@ object Cluster {
     }
 
     def unapply(c: Cluster): Option[(String, Seq[Vehicle], Seq[Commodity], Seq[Cluster])] =
-        Some((c.id, c.vehicles, c.commodities, c.subClusters.toSeq))
+        Some((Cluster.removeAppFromPath(c.id), c.vehicles, c.commodities, c.subClusters.toSeq))
 }
 
 
