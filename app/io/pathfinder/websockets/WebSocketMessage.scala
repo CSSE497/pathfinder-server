@@ -328,44 +328,6 @@ object WebSocketMessage {
     addComp(Read)
 
     /**
-     * Sent by the client that wants to get the clusters for an application
-     */
-    case class GetApplicationCluster(
-        id: String
-    ) extends WebSocketMessage {
-        override type M = GetApplicationCluster
-        override def companion = GetApplicationCluster
-        override def withApp(app: String): Option[GetApplicationCluster] =
-            Cluster.addAppToPath(id, app).map(path => copy(id = path))
-        override def withoutApp: GetApplicationCluster =
-            copy(id = Cluster.removeAppFromPath(id))
-    }
-
-    object GetApplicationCluster extends MessageCompanion[GetApplicationCluster] {
-        override val message = "GetApplicationCluster"
-        override val format = Json.format[GetApplicationCluster]
-    }
-    addComp(GetApplicationCluster)
-
-    case class ApplicationCluster(
-        id: String,
-        value: JsValue
-    ) extends WebSocketMessage {
-        override type M = ApplicationCluster
-        override def companion = ApplicationCluster
-        override def withApp(app: String): Option[ApplicationCluster] =
-            Cluster.addAppToPath(id, app).map(path => copy(id = path))
-        override def withoutApp: ApplicationCluster =
-            copy(id = Cluster.removeAppFromPath(id))
-    }
-
-    object ApplicationCluster extends MessageCompanion[ApplicationCluster] {
-        override val message = "ApplicationCluster"
-        override val format = Json.format[ApplicationCluster]
-    }
-    addComp(ApplicationCluster)
-
-    /**
      * Message sent to the client that requested a create
      */
     case class Created(

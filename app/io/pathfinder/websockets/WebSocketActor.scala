@@ -1,9 +1,8 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.{Application, Vehicle, Commodity}
 import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, VehicleId}
-import io.pathfinder.models.{Cluster, ModelId, Application, Vehicle, Commodity}
+import io.pathfinder.models.{Vehicle, Commodity}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
@@ -57,12 +56,6 @@ class WebSocketActor (
                         client ! Error("id: "+id.toString+" not found for model: "+id.modelType.toString)
 
                 case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c, app)).foreach(client ! _)
-
-                case GetApplicationCluster(id) => client ! Option(Cluster.finder.byId(id.toString)).map { cluster =>
-                    ApplicationCluster(id, Cluster.format.writes(cluster))
-                }.getOrElse{
-                    Error("No Cluster with path: " + id.toString + " found")
-                }
 
                 case Subscribe(None, _model, Some(id)) =>
                     client ! {
