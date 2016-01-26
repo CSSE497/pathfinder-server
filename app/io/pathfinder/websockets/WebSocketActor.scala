@@ -1,9 +1,8 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.{Application, Vehicle, Commodity}
 import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, VehicleId}
-import io.pathfinder.models.{Cluster, ModelId, Application, Vehicle, Commodity}
+import io.pathfinder.models.{Vehicle, Commodity}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
@@ -26,7 +25,7 @@ object WebSocketActor {
         ModelTypes.Commodity -> Commodity.Dao
     )
 
-    def props(out: ActorRef) = Props(new WebSocketActor(out))
+    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app))
 }
 
 /**
@@ -34,44 +33,42 @@ object WebSocketActor {
  * to push notifications.
  */
 class WebSocketActor (
-    client: ActorRef
+    client: ActorRef,
+    app: String
 ) extends Actor {
     import WebSocketActor.{controllers, observers}
 
-    override def receive = {
+    override def receive: PartialFunction[Any, Unit] = {
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
-            m match {
+            m.withApp(app).getOrElse{
+                client ! Error("Unable to parse cluster id")
+                return PartialFunction.empty
+            } match {
                 case Route(id) =>
                     if(!Router.routeRequest(client, id)) {
                         client ! Error("could not get route, could not find "+ id.modelType + " with id: " + id.id)
                     }
                 case RouteSubscribe(id) =>
                     if(Router.subscribeToRoute(client, id))
-                        client ! RouteSubscribed(id)
+                        client ! RouteSubscribed(id).withoutApp
                     else
                         client ! Error("id: "+id.toString+" not found for model: "+id.modelType.toString)
 
-                case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
-
-                case GetApplicationCluster(id) => client ! Option(Cluster.finder.byId(id.toString)).map { cluster =>
-                    ApplicationCluster(id, Cluster.format.writes(cluster))
-                }.getOrElse{
-                    Error("No Cluster with path: " + id.toString + " found")
-                }
+                case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c, app)).foreach(client ! _)
 
                 case Subscribe(None, _model, Some(id)) =>
                     client ! {
                         id match {
                             case VehicleId(vId) =>
                                 observers(ModelTypes.Vehicle).subscribeById(vId, client)
-                                Subscribed(None, None, Some(id))
+                                Subscribed(None, None, Some(id)).withoutApp
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).subscribeById(cId, client)
-                                Subscribed(None, None, Some(id))
+                                Subscribed(None, None, Some(id)).withoutApp
                             case ClusterPath(path) =>
                                 observers.values.foreach(_.subscribeByClusterPath(path, client))
-                                Subscribed(Some(path), None, Some(id))
+                                Subscribed(Some(path), None, Some(id)).withoutApp
                             case _Else => Error("Only subscriptions to vehicles and commodities are supported")
                         }
                     }
@@ -83,26 +80,26 @@ class WebSocketActor (
                 case Subscribe(Some(path), Some(modelType), None) =>
                     client ! observers.get(modelType).map{ obs =>
                         obs.subscribeByClusterPath(path, client)
-                        Subscribed(Some(path), Some(modelType), None)
+                        Subscribed(Some(path), Some(modelType), None).withoutApp
                     }.getOrElse(Error("Subscriptions to clusters by cluster not supported"))
 
                 // unsubscribe from everything
                 case Unsubscribe(None, None, None) =>
                     observers.foreach(_._2.unsubscribe(client))
-                    client ! Unsubscribed(None,None,None)
+                    client ! Unsubscribed(None,None,None).withoutApp
 
 
                 // unsubscribe from a specified cluster
                 case Unsubscribe(Some(cId), None, None) =>
                     observers.foreach(_._2.unsubscribeByClusterPath(cId, client))
-                    client ! Unsubscribed(Some(cId),None,None)
+                    client ! Unsubscribed(Some(cId),None,None).withoutApp
 
                 // unsubscribe from cluster for models of a specified type
                 case Unsubscribe(Some(cId), Some(model), None) =>
                     client ! observers.get(model).map {
                         obs =>
                             obs.unsubscribeByClusterPath(cId, client)
-                            Unsubscribed(Some(cId), Some(model), None)
+                            Unsubscribed(Some(cId), Some(model), None).withoutApp
                     }.getOrElse(Error("Cannot unsubscribe for model: "+model+" which has no support for subscriptions"))
 
                 // unsibscribe from a single model
@@ -111,13 +108,13 @@ class WebSocketActor (
                         id match {
                             case VehicleId(vId) =>
                                 observers(ModelTypes.Vehicle).unsubscribeById(vId, client)
-                                Unsubscribed(None, modelType, Some(id))
+                                Unsubscribed(None, modelType, Some(id)).withoutApp
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).unsubscribeById(cId, client)
-                                Unsubscribed(None, modelType, Some(id))
+                                Unsubscribed(None, modelType, Some(id)).withoutApp
                             case ClusterPath(path) =>
                                 observers.foreach(_._2.unsubscribeByClusterPath(path, client))
-                                Unsubscribed(Some(path), None, None)
+                                Unsubscribed(Some(path), None, None).withoutApp
                         }
                     }
                 case u: Unsubscribe =>

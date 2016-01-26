@@ -6,5 +6,5 @@ import io.pathfinder.websockets.WebSocketMessage
  * The websocket anologue to the MVC controllers
  */
 trait WebSocketController{
-    def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage]
+    def receive(webSocketMessage: WebSocketMessage, appId: String): Option[WebSocketMessage]
 }

@@ -17,6 +17,7 @@ public class BaseAppTest {
     public final Application PATHFINDER_APPLICATION = new Application();
     public static final String APPLICATION_ID = "001e7047-ee14-40d6-898a-5acf3a1cfd8a";
     public static final String CLUSTER_ID = APPLICATION_ID;
+    public static final String ROOT = "/root";
 
     public Cluster baseCluster() {
         return Cluster.finder().byId(CLUSTER_ID);

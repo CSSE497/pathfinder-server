@@ -4,7 +4,6 @@ import akka.actor.ActorRef
 import com.avaje.ebean.Model.Find
 import io.pathfinder.config.Global
 import io.pathfinder.data.{CrudDao, EbeanCrudDao, ObserverDao}
-import io.pathfinder.models.ModelId.ClusterPath
 import io.pathfinder.models.{HasId, HasCluster}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.WebSocketMessage.{Updated, Deleted, Created}
@@ -31,7 +30,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
 
     protected def onCreated(model: V): Unit = {
         Logger.info("Adding model to create channel: " + model)
-        val msg = Created(modelType, writer.writes(model))
+        val msg = Created(modelType, writer.writes(model)).withoutApp
         val id = model.id
         val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
@@ -41,7 +40,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
 
     protected def onDeleted(model: V): Unit = {
         Logger.info("Adding model to create channel: " + model)
-        val msg = Deleted(modelType, writer.writes(model))
+        val msg = Deleted(modelType, writer.writes(model)).withoutApp
         val id = model.id
         val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))
@@ -51,7 +50,7 @@ abstract class WebSocketDao[V <: HasCluster with HasId](dao: CrudDao[Long,V]) ex
 
     protected def onUpdated(model: V): Unit = {
         Logger.info("Adding model to create channel: "+model)
-        val msg = Updated(modelType, writer.writes(model))
+        val msg = Updated(modelType, writer.writes(model)).withoutApp
         val id = model.id
         val clusterId = model.cluster.id
         byIdPusher      ! Publish((id, msg))

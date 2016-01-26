@@ -34,7 +34,9 @@ object ModelId {
             }
         )
     }
+
     case class CommodityId(id: Long) extends LongId {
+        override type Id = CommodityId
         override def modelType = ModelTypes.Commodity
     }
 
@@ -47,8 +49,13 @@ object ModelId {
         )
     }
     case class ClusterPath(path: String) extends StringId {
+        override type Id = ClusterPath
         override def modelType = ModelTypes.Cluster
         override def id = path
+        override def withAppId(appId: String): Option[ClusterPath] =
+            Cluster.addAppToPath(path, appId).map(ClusterPath.apply)
+        override def withoutAppId: ClusterPath =
+            ClusterPath(Cluster.removeAppFromPath(path))
     }
 
     object VehicleId {
@@ -59,13 +66,18 @@ object ModelId {
             }
         )
     }
+
     case class VehicleId(id: Long) extends LongId {
+        override type Id = VehicleId
         override def modelType = ModelTypes.Vehicle
     }
 }
 
 sealed abstract class ModelId {
+    protected type Id <: ModelId
     type Key
     def modelType: ModelType
     def id: Key
+    def withAppId(app: String): Option[Id] = Some(this.asInstanceOf[Id])
+    def withoutAppId: Id = this.asInstanceOf[Id]
 }

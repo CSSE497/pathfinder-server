@@ -35,7 +35,7 @@ public class WebSocketActorTest extends BaseAppTest {
         Json.parse("{\"message\":\"Create\"," +
                     "\"model\":\"Cluster\"," +
                     "\"value\":{" +
-                        "\"id\":\"" + CLUSTER_ID + "/subcluster\"" +
+                        "\"id\":\"" + ROOT + "/subcluster\"" +
                     "}}");
     private static final JsValue JSON_CREATE_VEHICLE =
         Json.parse("{\"message\":\"Create\"," +
@@ -43,7 +43,7 @@ public class WebSocketActorTest extends BaseAppTest {
                     "\"value\":{" +
                         "\"latitude\":0.1," +
                         "\"longitude\":-12.3," +
-                        "\"clusterId\":\"" + CLUSTER_ID + "\"," +
+                        "\"clusterId\":\"" + ROOT + "\"," +
                         "\"metadata\":{\"capacity\":99}," +
                         "\"status\":\"Online\"" +
                     "}}");
@@ -55,11 +55,9 @@ public class WebSocketActorTest extends BaseAppTest {
                         "\"startLongitude\":-12.3," +
                         "\"endLatitude\":99.4," +
                         "\"endLongitude\":-3.5," +
-                        "\"clusterId\":\"" + CLUSTER_ID + "\"," +
+                        "\"clusterId\":\"" + ROOT + "\"," +
                         "\"metadata\":{\"param\":5}" +
                     "}}");
-    private static final JsValue JSON_GET_APPLICATION_CLUSTER =
-        Json.parse("{\"message\":\"GetApplicationCluster\", \"id\":\""+APPLICATION_ID+"\"}");
 
     private static final int TIMEOUT = 3000;
 
@@ -67,13 +65,13 @@ public class WebSocketActorTest extends BaseAppTest {
     public void initActor() {
         ActorSystem sys = ActorSystem.create();
         client = new TestProbe(sys);
-        final Props props = WebSocketActor.props(client.ref());
+        final Props props = WebSocketActor.props(client.ref(), APPLICATION_ID);
         socket = TestActorRef.create(sys, props);
     }
 
     @Test
     public void testCreateCluster() throws Exception {
-        final String PATH = CLUSTER_ID + "/subcluster";
+        final String PATH = ROOT + "/subcluster";
         Patterns.ask(socket, WebSocketMessage.format().reads(JSON_CREATE_CLUSTER).get(), TIMEOUT);
         Cluster createdCluster = new Cluster();
         createdCluster.id_$eq(PATH);
@@ -114,17 +112,5 @@ public class WebSocketActorTest extends BaseAppTest {
         createdCommodity.metadata_$eq(new JsObject(meta));
         client.expectMsg(new WebSocketMessage.Created(
             ModelTypes.Commodity(), Commodity.format().writes(createdCommodity)));
-    }
-
-    @Test
-    public void testGetApplicationClusters() {
-        Patterns.ask(socket, WebSocketMessage.format().reads(JSON_GET_APPLICATION_CLUSTER).get(), TIMEOUT);
-        JsValue json = Json.parse("{" +
-                "\"id\":\"" + CLUSTER_ID + "\"," +
-                "\"vehicles\":[]," +
-                "\"commodities\":[]," +
-                "\"subClusters\":[]" +
-        "}");
-        client.expectMsg(new WebSocketMessage.ApplicationCluster(APPLICATION_ID, json));
     }
 }
