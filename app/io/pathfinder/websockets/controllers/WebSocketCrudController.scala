@@ -22,22 +22,22 @@ abstract class WebSocketCrudController[K,V <: ebean.Model](
     val resources: Reads[_ <: Resource[V]]
 ) extends WebSocketController {
 
-    override def receive(webSocketMessage: WebSocketMessage): Option[WebSocketMessage] = {
+    override def receive(webSocketMessage: WebSocketMessage, appId: String): Option[WebSocketMessage] = {
         Logger.info(s"Received web socket crud request $webSocketMessage")
         webSocketMessage match {
             case Update(id, value) => Some(
                 resources.reads(value).map { res =>
-                    dao.update(id.id.asInstanceOf[K], res).map(
+                    dao.update(id.id.asInstanceOf[K], res.withAppId(appId).get).map(
                         m => Updated(model, writes.writes(m)).withoutApp
                     ) getOrElse Error("Could not update " + model + " with id " + id)
                 } getOrElse Error("Could not parse json in "+model+" Update Request: "+value)
             )
             case Create(m, value) => Some(
-                resources.reads(value).map(
-                    dao.create(_).map(
+                resources.reads(value).map{ res =>
+                    dao.create(res.withAppId(appId).get).map(
                         m => Created(model, writes.writes(m)).withoutApp
                     ) getOrElse Error("Could not create "+model+" from Create Request: "+value)
-                ) getOrElse Error("Could not parse json in "+model+" Create Request")
+                } getOrElse Error("Could not parse json in "+model+" Create Request")
             )
             case Delete(id) => Some(
                 dao.delete(id.id.asInstanceOf[K]).map(
@@ -49,7 +49,7 @@ abstract class WebSocketCrudController[K,V <: ebean.Model](
                     m => Model(model,writes.writes(m)).withoutApp
                 ) getOrElse Error("Could not read "+model+" with id "+id+", does this id exist?")
             )
-            case x: WebSocketMessage => Some(Error("No support for message: " + WebSocketMessage.format.writes(x) + " for model: "+model.toString))
+            case x: WebSocketMessage => Some(Error("No support for message: " + WebSocketMessage.format.writes(x.withoutApp) + " for model: "+model.toString))
         }
     }
 }

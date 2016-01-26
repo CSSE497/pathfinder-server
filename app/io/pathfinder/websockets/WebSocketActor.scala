@@ -56,7 +56,7 @@ class WebSocketActor (
                     else
                         client ! Error("id: "+id.toString+" not found for model: "+id.modelType.toString)
 
-                case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c)).foreach(client ! _)
+                case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c, app)).foreach(client ! _)
 
                 case GetApplicationCluster(id) => client ! Option(Cluster.finder.byId(id.toString)).map { cluster =>
                     ApplicationCluster(id, Cluster.format.writes(cluster))
