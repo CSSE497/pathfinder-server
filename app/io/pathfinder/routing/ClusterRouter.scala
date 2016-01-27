@@ -106,7 +106,7 @@ object ClusterRouter {
 class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBus with LookupClassification {
     import ClusterRouter._
 
-    private var cachedRoutes: Option[Seq[Route]] = None
+    private var cachedRoutes: Option[(Seq[Route], Seq[Commodity])] = None
 
     override type Event = (ModelId, Routed)
     override type Classifier = ModelId // subscribe by model and by id
@@ -122,30 +122,34 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         super.subscribe(client, c)
     }
 
-    def clusterRouted(routes: Seq[Route]): Routed = Routed(
-        ModelTypes.Cluster,
-        JsObject(Seq(("id",JsString(Cluster.removeAppFromPath(clusterPath))))),
-        Writes.seq(Route.writes).writes(routes)
-    )
+    def clusterRouted(routes: Seq[Route], coms: Seq[Commodity]): Routed = Routed(
+            ModelTypes.Cluster,
+            JsObject(Seq(
+                "id" -> JsString(Cluster.removeAppFromPath(clusterPath))
+            )),
+            Writes.seq(Route.writes).writes(routes),
+            Some(coms)
+        )
 
     def vehicleRouted(route: Route): Routed = Routed(
         ModelTypes.Vehicle,
         Vehicle.format.writes(route.vehicle),
-        Route.writes.writes(route)
+        Route.writes.writes(route),
+        None
     )
 
-    def publish(routes: Seq[Route]): Unit ={
-        publish((ModelId.ClusterPath(clusterPath), clusterRouted(routes))) // send list of routes to cluster subscribers
+    def publish(rc: (Seq[Route], Seq[Commodity])): Unit = rc match { case (routes, coms) =>
+        publish((ModelId.ClusterPath(clusterPath), clusterRouted(routes, coms))) // send list of routes to cluster subscribers
         routes.foreach { route =>
             val routeJson: JsValue = Route.writes.writes(route)
             val vehicleJson: JsValue = Vehicle.format.writes(route.vehicle)
 
             // publish vehicles to vehicle subscribers
-            publish((ModelId.VehicleId(route.vehicle.id), Routed(ModelTypes.Vehicle, vehicleJson, routeJson)))
+            publish((ModelId.VehicleId(route.vehicle.id), Routed(ModelTypes.Vehicle, vehicleJson, routeJson, None)))
             route.actions.tail.collect {
                 case PickUp(lat, lng, com) =>
                     val comJson = Commodity.format.writes(com) // publish commodities to commodity subscribers
-                    publish((ModelId.CommodityId(com.id), Routed(ModelTypes.Commodity, comJson, routeJson)))
+                    publish((ModelId.CommodityId(com.id), Routed(ModelTypes.Commodity, comJson, routeJson, None)))
                 case _Else => Unit
             }
         }
@@ -174,15 +178,15 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             case t =>
                 client ! Error("Failed to route cluster: "+t.getMessage)
                 Future.failed(t)
-        }.foreach( routes =>
+        }.foreach { case (routes, coms) =>
             mId match {
-                case ModelId.ClusterPath(path) => client ! clusterRouted(routes).withoutApp
-                case ModelId.VehicleId(id) => routes.find(_.vehicle.id == id).foreach{ route =>
+                case ModelId.ClusterPath(path) => client ! clusterRouted(routes, coms).withoutApp
+                case ModelId.VehicleId(id) => routes.find(_.vehicle.id == id).foreach { route =>
                     client ! vehicleRouted(route).withoutApp
                 }
                 case ModelId.CommodityId(id) =>
                     var commodity: Commodity = null
-                    routes.find{ route =>
+                    routes.find { route =>
                         route.actions.exists {
                             case PickUp(lat, lng, com) =>
                                 if (com.id == id) {
@@ -191,15 +195,16 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                                 } else false
                             case x => false
                         }
-                    }.foreach{ route =>
+                    }.foreach { route =>
                         client ! Routed(
                             ModelTypes.Commodity,
                             Commodity.format.writes(commodity),
-                            Route.writes.writes(route)
+                            Route.writes.writes(route),
+                            None
                         ).withoutApp
                     }
             }
-        )
+        }
         case _Else => super.receive(_Else)
     }
 
@@ -375,8 +380,8 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     Logger.warn("Failed to read route response", t)
                     Future.failed(t)
             }
-        }.flatMap[Seq[Route]]{ resp =>
-            parseRoutingResponse(vehicles, commodities, resp).map(Future.successful).recover{
+        }.flatMap[(Seq[Route], Seq[Commodity])]{ resp =>
+            parseRoutingResponse(vehicles, commodities, resp).map(routes => Future.successful((routes, Seq.empty))).recover{
                 case t => Future.failed(t)
             }.get
         }
