@@ -3,6 +3,7 @@ package io.pathfinder.routing
 import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import com.avaje.ebean.Model
+import io.pathfinder.models.ModelId.ClusterPath
 import io.pathfinder.models.{VehicleStatus, CommodityStatus, ModelId, Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{Start, DropOff, PickUp}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
@@ -118,6 +119,10 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     }
 
     override def subscribe(client: ActorRef, c: Classifier): Boolean = {
+        c match {
+            case ClusterPath(path) => super.subscribe(client, ClusterPath(clusterPath))
+            case modelId => super.subscribe(client, modelId)
+        }
         Logger.info("Websocket: "+ client+" subscribed to route updates for: "+c)
         super.subscribe(client, c)
     }
@@ -170,31 +175,43 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 e match {
                     case ClusterEvent(Events.Updated, v: Vehicle) =>
                         cachedRoutes.flatMap { case (routes, coms) =>
-                            var found = 0
-                            val replacement = routes.map { route =>
-                                if (route.vehicle.id == v.id) {
-                                    found += 1
-                                    route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
-                                } else route
-                            }
-                            if (found == 1) {
-                                // good to go
-                                Some((replacement, coms))
+                            if(VehicleStatus.Offline.equals(v.status)){
+                                if(routes.exists(_.vehicle.id == v.id)){
+                                    None
+                                } else {
+                                    Some((routes, coms))
+                                }
                             } else {
-                                Logger.warn(
-                                    "Received vehicle update for vehicle:" + v.id + " with " + found + " routes in cluster:" + clusterPath + ", routing is probably broken."
-                                )
-                                None // updated vehicle not in routes? Too many routes with the same vehicle? Something is wrong but we can recalculate.
+                                var found = 0
+                                val replacement = routes.map { route =>
+                                    if (route.vehicle.id == v.id) {
+                                        found += 1
+                                        route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
+                                    } else route
+                                }
+                                if (found == 1) {
+                                    // good to go
+                                    Some((replacement, coms))
+                                } else {
+                                    if(found > 1) {
+                                        Logger.warn(
+                                            "Received vehicle update for vehicle:" + v.id + " with " + found + " routes in cluster:" + clusterPath + ", routing is probably broken."
+                                        )
+                                    }
+                                    None // vehicle was turned Online
+                                }
                             }
                         }.map(Future.successful).getOrElse(recalculate()).onComplete { routeTry =>
                             Logger.info("Updating vehicle position for vehicle:" + v.id + " without recalculating routes")
-                            val newRoutes = routeTry.getOrElse {
+                            val newRoutes = routeTry.recoverWith { case e: Throwable =>
                                 // TODO: handle errors here
                                 Logger.warn("Error updating routes for cluster: " + clusterPath)
-                                return PartialFunction.empty
+                                Logger.trace(e.getMessage, e.getStackTrace)
+                                Failure(e)
+                            }.foreach{ newRoutes =>
+                                cachedRoutes = Some(newRoutes)
+                                publish(newRoutes)
                             }
-                            cachedRoutes = Some(newRoutes)
-                            publish(newRoutes)
                         }
                     case ClusterEvent(event, model) => recalculate().map {
                         res =>
