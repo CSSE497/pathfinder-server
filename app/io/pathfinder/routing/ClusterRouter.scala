@@ -169,7 +169,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             }) {
                 e match {
                     case ClusterEvent(Events.Updated, v: Vehicle) =>
-                        cachedRoutes.flatMap { routes =>
+                        cachedRoutes.flatMap { case (routes, coms) =>
                             var found = 0
                             val replacement = routes.map { route =>
                                 if (route.vehicle.id == v.id) {
@@ -179,7 +179,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             }
                             if (found == 1) {
                                 // good to go
-                                Some(replacement)
+                                Some((replacement, coms))
                             } else {
                                 Logger.warn(
                                     "Received vehicle update for vehicle:" + v.id + " with " + found + " routes in cluster:" + clusterPath + ", routing is probably broken."
@@ -190,7 +190,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             Logger.info("Updating vehicle position for vehicle:" + v.id + " without recalculating routes")
                             val newRoutes = routeTry.getOrElse {
                                 // TODO: handle errors here
-                                Logger.warn("Error updating routes for cluster: " + clusterPath);
+                                Logger.warn("Error updating routes for cluster: " + clusterPath)
                                 return PartialFunction.empty
                             }
                             cachedRoutes = Some(newRoutes)
