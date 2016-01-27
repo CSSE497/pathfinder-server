@@ -157,10 +157,48 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
      * The cluster router just recalculates whenever a route request or update occurs
      */
     override def receive: Receive = {
-        case ClusterEvent(event , model) => recalculate().map {
-            res =>
-                publish(res)
-                cachedRoutes = Some(res)
+        case e: ClusterEvent => {
+            if(e.model match {
+                case v: Vehicle => v.cluster.id == clusterPath
+                case c: Commodity => c.cluster.id == clusterPath
+                case cl: Cluster => cl.id == clusterPath
+            }) {
+                e match {
+                    case ClusterEvent(Events.Updated, v: Vehicle) =>
+                        cachedRoutes.flatMap { routes =>
+                            var found = 0
+                            val replacement = routes.map { route =>
+                                if (route.vehicle.id == v.id) {
+                                    found += 1
+                                    route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
+                                } else route
+                            }
+                            if (found == 1) {
+                                // good to go
+                                Some(replacement)
+                            } else {
+                                Logger.warn(
+                                    "Received vehicle update for vehicle:" + v.id + " with " + found + " routes in cluster:" + clusterPath + ", routing is probably broken."
+                                )
+                                None // updated vehicle not in routes? Too many routes with the same vehicle? Something is wrong but we can recalculate.
+                            }
+                        }.map(Future.successful).getOrElse(recalculate()).onComplete { routeTry =>
+                            Logger.info("Updating vehicle position for vehicle:" + v.id + " without recalculating routes")
+                            val newRoutes = routeTry.getOrElse {
+                                // TODO: handle errors here
+                                Logger.warn("Error updating routes for cluster: " + clusterPath);
+                                return PartialFunction.empty
+                            }
+                            cachedRoutes = Some(newRoutes)
+                            publish(newRoutes)
+                        }
+                    case ClusterEvent(event, model) => recalculate().map {
+                        res =>
+                            publish(res)
+                            cachedRoutes = Some(res)
+                    }
+                }
+            }
         }
         case RouteRequest(client, mId) => cachedRoutes.map { routes =>
             Logger.info("using cached routes")
