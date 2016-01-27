@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import com.avaje.ebean.Model
 import io.pathfinder.models.{VehicleStatus, CommodityStatus, ModelId, Commodity, Vehicle, Cluster}
-import io.pathfinder.routing.Action.{DropOff, PickUp}
+import io.pathfinder.routing.Action.{Start, DropOff, PickUp}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.WebSocketMessage.{Error, Routed}
 import io.pathfinder.websockets.pushing.EventBusActor
@@ -228,27 +228,25 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             routes => Success(routes)
         )
 
-    private def recalculate(): Future[Seq[Route]] = {
+    private def recalculate(): Future[(Seq[Route], Seq[Commodity])] = {
         val cluster: Cluster = Cluster.Dao.read(clusterPath).getOrElse{
             Logger.warn("Cluster with id: "+clusterPath+" missing")
             return Future.failed(null)
         }
         Logger.info("RECALCULATING")
         val vehicles = cluster.vehicles.filter(v => VehicleStatus.Online.equals(v.status))
-        if (vehicles.size <= 0) {
-            Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
-            return Future.failed(null)
-        }
-        Logger.info("GOT VEHICLES")
         val commodities = cluster.commodities.filter(
             c => CommodityStatus.Waiting.equals(c.status) || CommodityStatus.PickedUp.equals(c.status)
         )
+        if (vehicles.size <= 0) {
+            Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
+            return Future.successful((Seq.empty, commodities))
+        }
 
         if (commodities.size <= 0) {
             Logger.info("someone asked for Router to recalculate but there are no commodities in cluster")
-            return Future.failed(null)
+            return Future.successful((vehicles.map(v => Route(v, Seq(new Action.Start(v)))), Seq.empty))
         }
-        Logger.info("GOT COMMODITIES")
 
         val starts = vehicles.map(x => (x.latitude, x.longitude))
         val pickups = commodities.map(c => (c.startLatitude, c.startLongitude))
