@@ -32,6 +32,7 @@ object Router extends ActorEventBus with SubchannelClassification {
             if(!subs.contains(c.id)) {
                 val ref = Global.actorSystem.actorOf(ClusterRouter.props(c))
                 if (subscribe(ref, c.id)) {
+                    Logger.info("adding cluster router: " + ref + ", to cluster: " + c.id)
                     subs.put(c.id, ref)
                 } else {
                     Global.actorSystem.stop(ref)
@@ -77,6 +78,7 @@ object Router extends ActorEventBus with SubchannelClassification {
         if(!subs.contains(cluster.id)){
             add(cluster.id)
         }
+        Logger.info(client + " is subscribing to :" + id)
         publish((cluster.id, Subscribe(client, id)))
         publish(cluster, RouteRequest(client, id))
         true

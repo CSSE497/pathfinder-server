@@ -1,6 +1,6 @@
 package io.pathfinder.websockets
 
-import io.pathfinder.models.{Cluster, ModelId}
+import io.pathfinder.models.{Commodity, Cluster, ModelId}
 import io.pathfinder.websockets.WebSocketMessage.MessageCompanion
 import play.Logger
 import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
@@ -292,13 +292,16 @@ object WebSocketMessage {
     }
     addComp(Route)
 
+
+    private implicit val cFormat = io.pathfinder.models.Commodity.format
     /**
      * Response for a route request
      */
     case class Routed(
         model: ModelType,
         value: JsValue,
-        route: JsValue
+        route: JsValue,
+        unroutedCommodities: Option[Seq[Commodity]]
     ) extends ControllerMessage {
         override type M = Routed
         override def companion = Routed
