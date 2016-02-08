@@ -62,12 +62,12 @@ object ClusterRouter {
         def makeRequest(origins: TraversableOnce[(Double, Double)], dests: TraversableOnce[(Double, Double)]): Future[WSResponse] = {
             val req = apiKey.fold {
                 googleMaps.withQueryString(
-                    "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
-                    "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"))
+                    "origins" -> origins.map(latlng => f"${latlng._1}%.4f,${latlng._2}%.4f").mkString("|"),
+                    "destinations" -> dests.map(latlng => f"${latlng._1}%.4f,${latlng._2}%.4f").mkString("|"))
             } { key =>
                 googleMaps.withQueryString(
-                    "origins" -> origins.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
-                    "destinations" -> dests.map(latlng => f"(${latlng._1}%.4f,${latlng._2}%.4f)").mkString("|"),
+                    "origins" -> origins.map(latlng => f"${latlng._1}%.4f,${latlng._2}%.4f").mkString("|"),
+                    "destinations" -> dests.map(latlng => f"${latlng._1}%.4f,${latlng._2}%.4f").mkString("|"),
                     "key" -> key)
             }
             Logger.info(req.toString)
