@@ -104,7 +104,8 @@ object Router extends ActorEventBus with SubchannelClassification {
     def recalculate(client: ActorRef, clusterId: String): Unit = {
         if(subs.contains(clusterId) || Cluster.Dao.read(clusterId).exists(c => add(clusterId))) {
             publish((clusterId, ClusterRouterMessage.Recalculate(client)))
+        } else {
+            client ! WebSocketMessage.Error("No Cluster with id: " + Cluster.removeAppFromPath(clusterId) + " found")
         }
-        client ! WebSocketMessage.Error("No Cluster with id: " + Cluster.removeAppFromPath(clusterId) + " found")
     }
 }
