@@ -6,10 +6,10 @@ import com.avaje.ebean.Model
 import io.pathfinder.models.ModelId.ClusterPath
 import io.pathfinder.models.{VehicleStatus, CommodityStatus, ModelId, Commodity, Vehicle, Cluster}
 import io.pathfinder.routing.Action.{Start, DropOff, PickUp}
-import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
-import io.pathfinder.websockets.WebSocketMessage.{Error, Routed}
+import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{Recalculate, RouteRequest, ClusterEvent}
+import io.pathfinder.websockets.WebSocketMessage.{Recalculated, Error, Routed}
 import io.pathfinder.websockets.pushing.EventBusActor
-import io.pathfinder.websockets.{Events, ModelTypes}
+import io.pathfinder.websockets.{WebSocketMessage, Events, ModelTypes}
 import play.Logger
 import play.api.Play
 import play.api.libs.json.{JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
@@ -49,6 +49,8 @@ object ClusterRouter {
 
         /*** For when a client requests to see a specific route **/
         case class RouteRequest(client: ActorRef, id: ModelId) extends ClusterRouterMessage
+
+        case class Recalculate(client: ActorRef) extends ClusterRouterMessage
     }
 
     object DistanceFinder {
@@ -166,7 +168,21 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
      * The cluster router just recalculates whenever a route request or update occurs
      */
     override def receive: Receive = {
-        case e: ClusterEvent => {
+        case Recalculate(client) =>
+            recalculate().onComplete { routeTry =>
+                routeTry.map { case rc =>
+                    cachedRoutes = Some(rc)
+                    publish(rc)
+                    client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
+                } recover {
+                    case e =>
+                        Logger.warn("Error recalculating routes for cluster: " + clusterPath)
+                        Logger.trace(e.getMessage, e.getStackTrace)
+                        client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
+                        Failure(e)
+                }
+            }
+        case e: ClusterEvent =>
             if(e.model match {
                 case v: Vehicle => v.cluster.id == clusterPath
                 case c: Commodity => c.cluster.id == clusterPath
@@ -220,7 +236,6 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     }
                 }
             }
-        }
         case RouteRequest(client, mId) => cachedRoutes.map { routes =>
             Logger.info("using cached routes")
             Future.successful(routes)

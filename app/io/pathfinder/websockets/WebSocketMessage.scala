@@ -439,6 +439,40 @@ object WebSocketMessage {
     }
     addComp(Unsubscribed)
 
+    case class Recalculate(
+        clusterId: String
+    ) extends WebSocketMessage {
+        override type M = Recalculate
+        override def companion: MessageCompanion[M] = Recalculate
+        override def withApp(app: String): Option[Recalculate] =
+            Cluster.addAppToPath(clusterId, app).map(id => copy(clusterId = id))
+        override def withoutApp: Recalculate =
+            copy(clusterId = Cluster.removeAppFromPath(clusterId))
+    }
+
+    object Recalculate extends MessageCompanion[Recalculate] {
+        override def message: String = "Recalculate"
+        override def format: Format[Recalculate] = Json.format[Recalculate]
+    }
+    addComp(Recalculate)
+
+    case class Recalculated(
+        clusterId: String
+    ) extends WebSocketMessage {
+        override type M = Recalculated
+        override def companion = Recalculated
+        override def withApp(app: String): Option[Recalculated] =
+            Cluster.addAppToPath(clusterId, app).map(id => copy(clusterId = id))
+        override def withoutApp: Recalculated =
+            copy(clusterId = Cluster.removeAppFromPath(clusterId))
+    }
+
+    object Recalculated extends MessageCompanion[Recalculated] {
+        override def message = "Recalculated"
+        override def format: Format[Recalculated] = Json.format[Recalculated]
+    }
+    addComp(Recalculated)
+
     val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
 
     Logger.info("stringToMessage: [" + stringToMessage.keys.mkString("|")+"]")

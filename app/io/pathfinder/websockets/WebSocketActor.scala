@@ -55,6 +55,8 @@ class WebSocketActor (
                     else
                         client ! Error("id: "+id.toString+" not found for model: "+id.modelType.toString)
 
+                case Recalculate(cId) =>
+                    Router.recalculate(client, cId)
                 case c: ControllerMessage => controllers.get(c.model).flatMap(_.receive(c, app)).foreach(client ! _)
 
                 case Subscribe(None, _model, Some(id)) =>
