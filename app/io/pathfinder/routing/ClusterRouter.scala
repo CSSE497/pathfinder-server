@@ -15,7 +15,7 @@ import play.api.Play
 import play.api.libs.json.{JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
-import scala.concurrent.Future
+import scala.concurrent.{Promise, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.functional.syntax._
 import scala.language.postfixOps
@@ -108,9 +108,7 @@ object ClusterRouter {
 
 class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBus with LookupClassification {
     import ClusterRouter._
-
-    private var cachedRoutes: Option[(Seq[Route], Seq[Commodity])] = None
-
+    
     override type Event = (ModelId, Routed)
     override type Classifier = ModelId // subscribe by model and by id
 
@@ -129,15 +127,6 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         super.subscribe(client, c)
     }
 
-    def clusterRouted(routes: Seq[Route], coms: Seq[Commodity]): Routed = Routed(
-            ModelTypes.Cluster,
-            JsObject(Seq(
-                "id" -> JsString(Cluster.removeAppFromPath(clusterPath))
-            )),
-            Writes.seq(Route.writes).writes(routes),
-            Some(coms)
-        )
-
     def vehicleRouted(route: Route): Routed = Routed(
         ModelTypes.Vehicle,
         Vehicle.format.writes(route.vehicle),
@@ -145,9 +134,9 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         None
     )
 
-    def publish(rc: (Seq[Route], Seq[Commodity])): Unit = rc match { case (routes, coms) =>
-        publish((ModelId.ClusterPath(clusterPath), clusterRouted(routes, coms))) // send list of routes to cluster subscribers
-        routes.foreach { route =>
+    def publish(cr: ClusterRoute): Unit = {
+        publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
+        cr.routes.foreach { route =>
             val routeJson: JsValue = Route.writes.writes(route)
             val vehicleJson: JsValue = Vehicle.format.writes(route.vehicle)
 
@@ -170,9 +159,9 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     override def receive: Receive = {
         case Recalculate(client) =>
             recalculate().onComplete { routeTry =>
-                routeTry.map { case rc =>
-                    cachedRoutes = Some(rc)
-                    publish(rc)
+                routeTry.map { cr =>
+                    cachedRoutes = Some(cr)
+                    publish(cr)
                     client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
                 } recover {
                     case e =>
@@ -190,16 +179,16 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             }) {
                 e match {
                     case ClusterEvent(Events.Updated, v: Vehicle) =>
-                        cachedRoutes.flatMap { case (routes, coms) =>
+                        cachedRoutes.flatMap { cr =>
                             if(VehicleStatus.Offline.equals(v.status)){
-                                if(routes.exists(_.vehicle.id == v.id)){
+                                if(cr.routes.exists(_.vehicle.id == v.id)){
                                     None
                                 } else {
-                                    Some((routes, coms))
+                                    Some(cr)
                                 }
                             } else {
                                 var found = 0
-                                val replacement = routes.map { route =>
+                                val replacement = cr.routes.map { route =>
                                     if (route.vehicle.id == v.id) {
                                         found += 1
                                         route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
@@ -207,7 +196,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                                 }
                                 if (found == 1) {
                                     // good to go
-                                    Some((replacement, coms))
+                                    Some(cr.copy(routes = replacement))
                                 } else {
                                     if(found > 1) {
                                         Logger.warn(
@@ -219,7 +208,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             }
                         }.map(Future.successful).getOrElse(recalculate()).onComplete { routeTry =>
                             Logger.info("Updating vehicle position for vehicle:" + v.id + " without recalculating routes")
-                            val newRoutes = routeTry.recoverWith { case e: Throwable =>
+                            routeTry.recoverWith { case e: Throwable =>
                                 // TODO: handle errors here
                                 Logger.warn("Error updating routes for cluster: " + clusterPath)
                                 Logger.trace(e.getMessage, e.getStackTrace)
@@ -248,15 +237,15 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             case t =>
                 client ! Error("Failed to route cluster: "+t.getMessage)
                 Future.failed(t)
-        }.foreach { case (routes, coms) =>
+        }.foreach { rc =>
             mId match {
-                case ModelId.ClusterPath(path) => client ! clusterRouted(routes, coms).withoutApp
-                case ModelId.VehicleId(id) => routes.find(_.vehicle.id == id).foreach { route =>
+                case ModelId.ClusterPath(path) => client ! rc.routed
+                case ModelId.VehicleId(id) => rc.routes.find(_.vehicle.id == id).foreach { route =>
                     client ! vehicleRouted(route).withoutApp
                 }
                 case ModelId.CommodityId(id) =>
                     var commodity: Commodity = null
-                    routes.find { route =>
+                    rc.routes.find { route =>
                         route.actions.exists {
                             case PickUp(lat, lng, com) =>
                                 if (com.id == id) {
@@ -303,7 +292,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             routes => Success(routes)
         )
 
-    private def recalculate(): Future[(Seq[Route], Seq[Commodity])] = {
+    private def recalculate(): Future[ClusterRoute] = {
+        /*if(isRequesting){
+            isDirty = true
+            return
+        }*/
         val cluster: Cluster = Cluster.Dao.read(clusterPath).getOrElse{
             Logger.warn("Cluster with id: "+clusterPath+" missing")
             return Future.failed(null)
@@ -315,12 +308,12 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         )
         if (vehicles.size <= 0) {
             Logger.info("Someone asked Router to recalculate but there are no vehicles in cluster.")
-            return Future.successful((Seq.empty, commodities))
+            return Future.successful(ClusterRoute(clusterPath, Seq.empty, commodities))
         }
 
         if (commodities.size <= 0) {
             Logger.info("someone asked for Router to recalculate but there are no commodities in cluster")
-            return Future.successful((vehicles.map(v => Route(v, Seq(new Action.Start(v)))), Seq.empty))
+            return Future.successful(ClusterRoute(clusterPath, vehicles.map(v => Route(v, Seq(new Action.Start(v)))), Seq.empty))
         }
 
         val starts = vehicles.map(x => (x.latitude, x.longitude))
@@ -450,10 +443,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     Logger.warn("Failed to read route response", t)
                     Future.failed(t)
             }
-        }.flatMap[(Seq[Route], Seq[Commodity])]{ resp =>
-            parseRoutingResponse(vehicles, commodities, resp).map(routes => Future.successful((routes, Seq.empty))).recover{
-                case t => Future.failed(t)
-            }.get
+        }.flatMap { resp =>
+            parseRoutingResponse(vehicles, commodities, resp).map(routes =>
+                Future.successful(ClusterRoute(clusterPath, routes, Seq.empty))).recover{
+                    case t => Future.failed(t)
+                }.get
         }
     }
 }
