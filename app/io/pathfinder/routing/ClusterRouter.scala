@@ -3,9 +3,11 @@ package io.pathfinder.routing
 import akka.actor.{ActorRef, Props}
 import akka.event.{ActorEventBus, LookupClassification}
 import com.avaje.ebean.Model
+import io.pathfinder.config.Global
 import io.pathfinder.models.ModelId.ClusterPath
 import io.pathfinder.models.{VehicleStatus, CommodityStatus, ModelId, Commodity, Vehicle, Cluster}
-import io.pathfinder.routing.Action.{Start, DropOff, PickUp}
+import io.pathfinder.routing.Action.{DropOff, PickUp}
+import io.pathfinder.routing.ClusterRouter.CacheState.{Updating, UpToDate}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{Recalculate, RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.WebSocketMessage.{Recalculated, Error, Routed}
 import io.pathfinder.websockets.pushing.EventBusActor
@@ -15,10 +17,11 @@ import play.api.Play
 import play.api.libs.json.{JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.functional.syntax._
 import scala.language.postfixOps
+import scala.concurrent.duration._
 
 import scala.util.{Failure, Success, Try}
 
@@ -104,11 +107,37 @@ object ClusterRouter {
                 _.recover{case t => return Future.failed(t)}.map(Future.successful).get
             )
     }
+
+    abstract sealed class CacheState {
+        def asFuture: Future[ClusterRoute]
+        def events: Seq[ClusterEvent]
+        def version: Int // each cache state has a version number which indicate which route is being held or requested
+    }
+
+    object CacheState {
+
+        // a route calculation is in progress
+        case class Updating(routes: Future[ClusterRoute], events: Seq[ClusterEvent], version: Int) extends CacheState {
+            override def asFuture: Future[ClusterRoute] = routes
+        }
+
+        // an up to date route is available
+        case class UpToDate(routes: ClusterRoute, version: Int) extends CacheState {
+            override def asFuture: Future[ClusterRoute] = {
+                Logger.info("Using cached routes")
+                Future.successful(routes)
+            }
+            override def events = Seq.empty
+        }
+    }
 }
 
 class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBus with LookupClassification {
     import ClusterRouter._
-    
+
+    @volatile
+    private var cachedRoutes: CacheState = Updating(recalculate(), Seq.empty, 0)
+
     override type Event = (ModelId, Routed)
     override type Classifier = ModelId // subscribe by model and by id
 
@@ -151,24 +180,110 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         }
     }
 
+    private def addErrorHandling[E](f: Future[E]): Future[E] = {
+        f.onFailure{
+            case e: Throwable =>
+                Logger.warn("Error updating routes for cluster: " + clusterPath)
+                Logger.trace(e.getMessage, e.getStackTrace)
+        }
+        f
+    }
+
+    private def after[E](f: Future[E]): Future[E] =
+        akka.pattern.after(0.seconds, Global.actorSystem.scheduler)(f)
+
     override protected def mapSize(): Int = 16
+
+    // returns Some(ClusterRoute) when the routes can be changed without a recalculation, otherwise it returns None
+    private def handleEvent(e: ClusterEvent, cr: ClusterRoute): Option[ClusterRoute] =
+        e match {
+            case ClusterEvent(Events.Updated, v: Vehicle) =>
+                if (VehicleStatus.Offline.equals(v.status)) {
+                    if (cr.routes.exists(_.vehicle.id == v.id)) {
+                        None
+                    } else {
+                        Some(cr)
+                    }
+                } else {
+                    var found = 0
+                    val replacement = cr.routes.map {
+                        route =>
+                            if (route.vehicle.id == v.id) {
+                                found += 1
+                                route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
+                            } else route
+                    }
+                    if (found == 1) {
+                        // good to go
+                        Some(cr.copy(routes = replacement))
+                    } else {
+                        if (found > 1) {
+                            Logger.warn(
+                                "Received vehicle update for vehicle:" + v.id + " with " + found + " routes in cluster:" + clusterPath + ", routing is probably broken."
+                            )
+                        }
+                        None // vehicle was turned Online
+                    }
+                }
+            case ClusterEvent(event, model) => None
+        }
+
+    private def handleEvents(es: Seq[ClusterEvent], init: ClusterRoute): (ClusterRoute,Boolean) =
+        (
+            es.foldLeft(init) {
+                (cr, e) => handleEvent(e, cr).getOrElse(return (cr, false))
+            },
+            true
+        )
+
+    private def handleUpdating(futureRoutes: Future[ClusterRoute], version: Int): Unit = {
+        futureRoutes.onComplete { routeTry =>
+            routeTry.map { cr =>
+                synchronized {
+                    if(cachedRoutes.version == version) {
+                        handleEvents(cachedRoutes.events, cr) match {
+                            case (ncr, true) =>
+                                cachedRoutes = CacheState.UpToDate(ncr, version)
+                                publish(ncr)
+                            case (ncr, false) =>
+                                val next = recalculate()
+                                cachedRoutes = Updating(next, Seq.empty, version+1)
+                                handleUpdating(next, version + 1)
+                                publish(ncr)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /*
      * The cluster router just recalculates whenever a route request or update occurs
      */
     override def receive: Receive = {
         case Recalculate(client) =>
-            recalculate().onComplete { routeTry =>
-                routeTry.map { cr =>
-                    cachedRoutes = Some(cr)
-                    publish(cr)
-                    client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
-                } recover {
-                    case e =>
-                        Logger.warn("Error recalculating routes for cluster: " + clusterPath)
-                        Logger.trace(e.getMessage, e.getStackTrace)
-                        client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
-                        Failure(e)
+            synchronized {
+                cachedRoutes match {
+                    case UpToDate(routes, version) =>
+                        val futureRoutes = recalculate()
+                        cachedRoutes = Updating(futureRoutes, Seq.empty, version + 1)
+                        handleUpdating(futureRoutes, version + 1)
+                    case Updating(future, events, version) => // we ignore the events since we are updating everything
+                        val next = after(future).flatMap(x => recalculate())
+                        cachedRoutes = Updating(
+                            next,
+                            Seq.empty,
+                            version + 1
+                        )
+                        handleUpdating(next, version+1)
+                        next.onComplete{
+                            case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
+                        }
+                        next.onFailure {
+                            case e =>
+                                client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
+                                Failure(e)
+                        }
                 }
             }
         case e: ClusterEvent =>
@@ -177,63 +292,21 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 case c: Commodity => c.cluster.id == clusterPath
                 case cl: Cluster => cl.id == clusterPath
             }) {
-                e match {
-                    case ClusterEvent(Events.Updated, v: Vehicle) =>
-                        cachedRoutes.flatMap { cr =>
-                            if(VehicleStatus.Offline.equals(v.status)){
-                                if(cr.routes.exists(_.vehicle.id == v.id)){
-                                    None
-                                } else {
-                                    Some(cr)
-                                }
-                            } else {
-                                var found = 0
-                                val replacement = cr.routes.map { route =>
-                                    if (route.vehicle.id == v.id) {
-                                        found += 1
-                                        route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
-                                    } else route
-                                }
-                                if (found == 1) {
-                                    // good to go
-                                    Some(cr.copy(routes = replacement))
-                                } else {
-                                    if(found > 1) {
-                                        Logger.warn(
-                                            "Received vehicle update for vehicle:" + v.id + " with " + found + " routes in cluster:" + clusterPath + ", routing is probably broken."
-                                        )
-                                    }
-                                    None // vehicle was turned Online
-                                }
+                synchronized {
+                    cachedRoutes match {
+                        case UpToDate(cr, v) =>
+                            cachedRoutes = handleEvent(e, cr).map(
+                                UpToDate(_, v + 1)
+                            ).getOrElse {
+                                val ncrf = recalculate()
+                                handleUpdating(ncrf, v + 1)
+                                Updating(ncrf, Seq.empty, v + 1)
                             }
-                        }.map(Future.successful).getOrElse(recalculate()).onComplete { routeTry =>
-                            Logger.info("Updating vehicle position for vehicle:" + v.id + " without recalculating routes")
-                            routeTry.recoverWith { case e: Throwable =>
-                                // TODO: handle errors here
-                                Logger.warn("Error updating routes for cluster: " + clusterPath)
-                                Logger.trace(e.getMessage, e.getStackTrace)
-                                Failure(e)
-                            }.foreach{ newRoutes =>
-                                cachedRoutes = Some(newRoutes)
-                                publish(newRoutes)
-                            }
-                        }
-                    case ClusterEvent(event, model) => recalculate().map {
-                        res =>
-                            publish(res)
-                            cachedRoutes = Some(res)
+                        case u: Updating => cachedRoutes = u.copy(events = u.events :+ e)
                     }
                 }
             }
-        case RouteRequest(client, mId) => cachedRoutes.map { routes =>
-            Logger.info("using cached routes")
-            Future.successful(routes)
-        }.getOrElse(
-            recalculate().map{ routes =>
-                cachedRoutes = Some(routes)
-                routes
-            }
-        ).recoverWith{
+        case RouteRequest(client, mId) => cachedRoutes.asFuture.recoverWith{
             case t =>
                 client ! Error("Failed to route cluster: "+t.getMessage)
                 Future.failed(t)
@@ -293,13 +366,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         )
 
     private def recalculate(): Future[ClusterRoute] = {
-        /*if(isRequesting){
-            isDirty = true
-            return
-        }*/
+
         val cluster: Cluster = Cluster.Dao.read(clusterPath).getOrElse{
             Logger.warn("Cluster with id: "+clusterPath+" missing")
-            return Future.failed(null)
+            // return Future.failed(null)
+            throw new scala.Error("NO CLUSTER WITH ID: " + clusterPath)
         }
         Logger.info("RECALCULATING")
         val vehicles = cluster.vehicles.filter(v => VehicleStatus.Online.equals(v.status))
@@ -427,7 +498,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 "objective" -> JsString(fun.function)
             ))
         }
-        body.recoverWith[JsValue]{
+        addErrorHandling(body.recoverWith[JsValue]{
             case t =>
                 Logger.error("Failed to request and receive route data from google maps api", t)
                 Future.failed(t)
@@ -448,6 +519,6 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 Future.successful(ClusterRoute(clusterPath, routes, Seq.empty))).recover{
                     case t => Future.failed(t)
                 }.get
-        }
+        })
     }
 }
