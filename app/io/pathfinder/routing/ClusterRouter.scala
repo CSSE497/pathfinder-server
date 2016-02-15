@@ -136,7 +136,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     import ClusterRouter._
 
     @volatile
-    private var cachedRoutes: CacheState = Updating(recalculate(), Seq.empty, 0)
+    private var cachedRoutes: CacheState = handleUpdating(Updating(recalculate(), Seq.empty, 0))
 
     override type Event = (ModelId, Routed)
     override type Classifier = ModelId // subscribe by model and by id
@@ -236,6 +236,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             true
         )
 
+    private def handleUpdating(u: Updating): Updating = {
+        handleUpdating(u.routes, u.version)
+        u
+    }
+
     private def handleUpdating(futureRoutes: Future[ClusterRoute], version: Int): Unit = {
         futureRoutes.onComplete { routeTry =>
             routeTry.map { cr =>
@@ -265,17 +270,14 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             synchronized {
                 cachedRoutes match {
                     case UpToDate(routes, version) =>
-                        val futureRoutes = recalculate()
-                        cachedRoutes = Updating(futureRoutes, Seq.empty, version + 1)
-                        handleUpdating(futureRoutes, version + 1)
+                        cachedRoutes = handleUpdating(Updating(recalculate(), Seq.empty, version + 1))
                     case Updating(future, events, version) => // we ignore the events since we are updating everything
                         val next = after(future).flatMap(x => recalculate())
-                        cachedRoutes = Updating(
+                        cachedRoutes = handleUpdating(Updating(
                             next,
                             Seq.empty,
                             version + 1
-                        )
-                        handleUpdating(next, version+1)
+                        ))
                         next.onComplete{
                             case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
                         }
@@ -293,15 +295,15 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 case cl: Cluster => cl.id == clusterPath
             }) {
                 synchronized {
+                    Logger.info("Received event :" + e)
+                    Logger.info("Cached Routes: " + cachedRoutes)
                     cachedRoutes match {
                         case UpToDate(cr, v) =>
                             cachedRoutes = handleEvent(e, cr).map { ncr =>
                                 publish(ncr)
                                 UpToDate(ncr, v + 1)
                             }.getOrElse {
-                                val ncrf = recalculate()
-                                handleUpdating(ncrf, v + 1)
-                                Updating(ncrf, Seq.empty, v + 1)
+                                handleUpdating(Updating(recalculate(), Seq.empty, v + 1))
                             }
                         case u: Updating => cachedRoutes = u.copy(events = u.events :+ e)
                     }
