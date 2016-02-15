@@ -295,9 +295,10 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 synchronized {
                     cachedRoutes match {
                         case UpToDate(cr, v) =>
-                            cachedRoutes = handleEvent(e, cr).map(
-                                UpToDate(_, v + 1)
-                            ).getOrElse {
+                            cachedRoutes = handleEvent(e, cr).map { ncr =>
+                                publish(ncr)
+                                UpToDate(ncr, v + 1)
+                            }.getOrElse {
                                 val ncrf = recalculate()
                                 handleUpdating(ncrf, v + 1)
                                 Updating(ncrf, Seq.empty, v + 1)
