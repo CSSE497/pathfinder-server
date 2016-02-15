@@ -245,6 +245,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         futureRoutes.onComplete { routeTry =>
             routeTry.map { cr =>
                 synchronized {
+                    Logger.info("Update received: " + cachedRoutes.version + " == " + version)
                     if(cachedRoutes.version == version) {
                         handleEvents(cachedRoutes.events, cr) match {
                             case (ncr, true) =>
