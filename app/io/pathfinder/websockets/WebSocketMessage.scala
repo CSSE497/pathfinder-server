@@ -491,7 +491,9 @@ object WebSocketMessage {
                     ).mkString("\n\n"))
                 ).asInstanceOf[WebSocketMessage]
             }.getOrElse(UnknownMessage(json)) },
-            { msg => (msg.message, msg.toJson) }
+            { msg =>
+                Logger.info("Sending Message: " + msg) 
+                (msg.message, msg.toJson) }
         )
 
     /**
