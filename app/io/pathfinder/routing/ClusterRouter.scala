@@ -167,6 +167,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     )
 
     def publish(cr: ClusterRoute, version: Int): Unit = {
+        Logger.info("Published Version check: " + version + " > " + publishedVersion)
         if(version > publishedVersion) { // don't send outdated routes
             publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
             cr.routes.foreach { route =>
@@ -204,6 +205,8 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     private def handleEvent(e: ClusterEvent, cr: ClusterRoute): Option[ClusterRoute] =
         e match {
             case ClusterEvent(Events.Updated, v: Vehicle) =>
+                Logger.info("vehicle Updated received: " + e)
+                Logger.info("for route: " + cr)
                 if (VehicleStatus.Offline.equals(v.status)) {
                     if (cr.routes.exists(_.vehicle.id == v.id)) {
                         None
@@ -255,13 +258,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     if(cachedRoutes.version == version) {
                         handleEvents(cachedRoutes.events, cr) match {
                             case (ncr, true) =>
-                                cachedRoutes = CacheState.UpToDate(ncr, version+1)
+                                cachedRoutes = CacheState.UpToDate(ncr, version)
                                 publish(ncr, version)
                             case (ncr, false) =>
-                                val next = recalculate()
-                                cachedRoutes = Updating(next, Seq.empty, version+1)
-                                handleUpdating(next, version + 1)
-                                publish(ncr, version + 1)
+                                cachedRoutes = handleUpdating(Updating(recalculate(), Seq.empty, version+1))
+                                publish(ncr, version)
                         }
                     } else publish(cr, version)
                 }
