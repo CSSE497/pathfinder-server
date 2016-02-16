@@ -167,7 +167,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     )
 
     def publish(cr: ClusterRoute, version: Int): Unit = {
-        if(version > publishedVersion) {
+        if(version > publishedVersion) { // don't send outdated routes
             publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
             cr.routes.foreach { route =>
                 val routeJson: JsValue = Route.writes.writes(route)
@@ -278,7 +278,13 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 Logger.info("ClusterRouter received recalculate request")
                 cachedRoutes match {
                     case UpToDate(routes, version) =>
-                        cachedRoutes = handleUpdating(Updating(recalculate(), Seq.empty, version + 1))
+                        val updating = handleUpdating(Updating(recalculate(), Seq.empty, version + 1))
+                        updating.routes.onSuccess{
+                            case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
+                        }
+                        updating.routes.onFailure{
+                            case e => client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
+                        }
                     case Updating(future, events, version) => // we ignore the events since we are updating everything
                         val next = after(future).flatMap(x => recalculate())
                         cachedRoutes = handleUpdating(Updating(
@@ -286,13 +292,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             Seq.empty,
                             version + 1
                         ))
-                        next.onComplete{
+                        next.onSuccess{
                             case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
                         }
                         next.onFailure {
-                            case e =>
-                                client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
-                                Failure(e)
+                            case e => client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
                         }
                 }
             }
@@ -308,7 +312,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     cachedRoutes match {
                         case UpToDate(cr, v) =>
                             cachedRoutes = handleEvent(e, cr).map { ncr =>
-                                publish(ncr)
+                                publish(ncr, v + 1)
                                 UpToDate(ncr, v + 1)
                             }.getOrElse {
                                 handleUpdating(Updating(recalculate(), Seq.empty, v + 1))
