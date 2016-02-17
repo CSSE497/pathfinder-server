@@ -257,13 +257,19 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     private def handleEvents(es: Seq[RoutingEvent], init: ClusterRoute): (ClusterRoute,Seq[RoutingEvent]) =
         (
             es.tails.foldLeft(init) { // update received, apply each of the next updates in order
-                (cr, es) => updateRouteFromEvent(es.head, cr).getOrElse{ // apply cluster updates until an update requires a reroute
-                    return (
-                        es.tail.foldLeft(cr) { // reroute required, apply remaining cluster updates that do not require reroute
-                            (cr2, e) => updateRouteFromEvent(e, cr2).getOrElse(cr2)
-                        },
-                        es
-                    )
+                (cr, es) => if(es.isEmpty) {
+                    cr
+                } else {
+                    updateRouteFromEvent(es.head, cr).getOrElse {
+                        // apply cluster updates until an update requires a reroute
+                        return (
+                          es.tail.foldLeft(cr) {
+                              // reroute required, apply remaining cluster updates that do not require reroute
+                              (cr2, e) => updateRouteFromEvent(e, cr2).getOrElse(cr2)
+                          },
+                          es
+                          )
+                    }
                 }
             },
             Seq.empty
@@ -291,20 +297,19 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             ", cause: " + e.getMessage
                         )
                 }
-            case _ => ()
+            case c: ClusterEvent => ()
         }
-        u.routes.onComplete { routeTry =>
-            routeTry.map { cr =>
-                synchronized {
-                    Logger.info("Update received")
-                    handleEvents(rest, cr) match {
-                        case (ncr, Seq()) =>
+        u.routes.onSuccess { case cr =>
+            synchronized {
+                Logger.info("Update received")
+                handleEvents(rest, cr) match {
+                    case (ncr, events) =>
+                        if(events.isEmpty){
                             cachedRoutes = CacheState.UpToDate(ncr)
-                            publish(ncr)
-                        case (ncr, events) =>
+                        } else {
                             cachedRoutes = handleUpdating(Updating(Some(ncr), recalculate(), events))
-                            publish(ncr)
-                    }
+                        }
+                        publish(ncr)
                 }
             }
         }
@@ -342,7 +347,17 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             }.getOrElse {
                                 handleUpdating(Updating(Some(cr), recalculate(), Seq(e)))
                             }
-                        case u: Updating => cachedRoutes = u.copy(events = u.events :+ e)
+                        case u: Updating =>
+                            Logger.info("Received event while updating with oldroute is present?" + u.oldRoutes.isDefined)
+                            cachedRoutes = u.copy(events = u.events :+ e)
+                            u.oldRoutes.foreach{ ors =>
+                                this.updateRouteFromEvent(e, ors).foreach{
+                                    nors =>
+                                        Logger.info("Updating old routes")
+                                        cachedRoutes = u.copy(oldRoutes = Some(nors), events = u.events :+ e)
+                                        publish(nors)
+                                }
+                            }
                     }
                 }
             }
