@@ -7,8 +7,8 @@ import akka.event.{SubchannelClassification, ActorEventBus}
 import akka.util.{Subclassification, Timeout}
 import io.pathfinder.config.Global
 import io.pathfinder.models.{ModelId, HasCluster, Cluster, Commodity, Vehicle}
-import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage
-import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
+import io.pathfinder.routing.ClusterRouter.RoutingEvent$
+import io.pathfinder.routing.ClusterRouter.RoutingEvent.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Subscribe
 import io.pathfinder.websockets.{WebSocketMessage, Events}
 import play.Logger
@@ -93,7 +93,7 @@ object Router extends ActorEventBus with SubchannelClassification {
         true
     }
 
-    def publish(cluster: Cluster, msg: ClusterRouterMessage): Unit = {
+    def publish(cluster: Cluster, msg: RoutingEvent): Unit = {
         publish((cluster.id, msg))
     }
 
@@ -103,7 +103,7 @@ object Router extends ActorEventBus with SubchannelClassification {
 
     def recalculate(client: ActorRef, clusterId: String): Unit = {
         if(subs.contains(clusterId) || Cluster.Dao.read(clusterId).exists(c => add(clusterId))) {
-            publish((clusterId, ClusterRouterMessage.Recalculate(client)))
+            publish((clusterId, RoutingEvent.Recalculate(client)))
         } else {
             client ! WebSocketMessage.Error("No Cluster with id: " + Cluster.removeAppFromPath(clusterId) + " found")
         }
