@@ -7,7 +7,7 @@ import akka.event.{SubchannelClassification, ActorEventBus}
 import akka.util.{Subclassification, Timeout}
 import io.pathfinder.config.Global
 import io.pathfinder.models.{ModelId, HasCluster, Cluster, Commodity, Vehicle}
-import io.pathfinder.routing.ClusterRouter.RoutingEvent$
+import io.pathfinder.routing.ClusterRouter.{RoutingEvent, RoutingEvent$}
 import io.pathfinder.routing.ClusterRouter.RoutingEvent.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Subscribe
 import io.pathfinder.websockets.{WebSocketMessage, Events}

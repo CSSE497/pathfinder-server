@@ -10,7 +10,7 @@ import io.pathfinder.routing.ClusterRouter.CacheState.{Empty, Updating, UpToDate
 import io.pathfinder.routing.ClusterRouter.RoutingEvent.{Recalculate, RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.WebSocketMessage.{Recalculated, Error, Routed}
 import io.pathfinder.websockets.pushing.EventBusActor
-import io.pathfinder.websockets.{WebSocketMessage, Events, ModelTypes}
+import io.pathfinder.websockets.{Events, ModelTypes}
 import play.Logger
 import play.api.Play
 import play.api.libs.json.{JsResultException, JsString, JsArray, Reads, __, JsNumber, JsObject, Writes, JsValue}
@@ -106,36 +106,21 @@ object ClusterRouter {
             )
     }
 
-    abstract sealed class CacheState {
-        def asFuture: Future[ClusterRoute]
-        def events: Seq[ClusterEvent]
-    }
+    abstract sealed class CacheState
 
     object CacheState {
 
-        case object Empty extends CacheState {
-            override def asFuture: Future[ClusterRoute] = Future.failed(new NoSuchElementException("No Route calculated"))
-
-            override def events: Seq[ClusterEvent] = Seq.empty
-        }
+        case object Empty extends CacheState
 
         // a route calculation is in progress
         case class Updating(
             oldRoutes: Option[ClusterRoute],
             routes: Future[ClusterRoute],
             events: Seq[RoutingEvent] // all unfinished events, its head is the event that triggered the recalculation
-        ) extends CacheState {
-            override def asFuture: Future[ClusterRoute] = routes
-        }
+        ) extends CacheState
 
         // an up to date route is available
-        case class UpToDate(routes: ClusterRoute) extends CacheState {
-            override def asFuture: Future[ClusterRoute] = {
-                Logger.info("Using cached routes")
-                Future.successful(routes)
-            }
-            override def events = Seq.empty
-        }
+        case class UpToDate(routes: ClusterRoute) extends CacheState
     }
 }
 
@@ -289,17 +274,17 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         // check if recalculation occurred
         current match {
             case Recalculate(client) =>
-                u.asFuture.onSuccess{
+                u.routes.onSuccess{
                     case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
                 }
-                u.asFuture.onFailure{
+                u.routes.onFailure{
                     case e => client ! Error("Failed to recalculate routes for cluster: "+Cluster.removeAppFromPath(clusterPath))
                 }
             case r: RouteRequest =>
-                u.asFuture.onSuccess{
+                u.routes.onSuccess{
                     case cr => handleRouteRequest(r,cr)
                 }
-                u.asFuture.onFailure{
+                u.routes.onFailure{
                     case e =>
                         r.client ! Error(
                             "Failed to calculate route for cluster: " + Cluster.removeAppFromPath(clusterPath) +
@@ -308,12 +293,12 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 }
             case _ => ()
         }
-        u.asFuture.onComplete { routeTry =>
+        u.routes.onComplete { routeTry =>
             routeTry.map { cr =>
                 synchronized {
                     Logger.info("Update received")
                     handleEvents(rest, cr) match {
-                        case (ncr, Seq.empty) =>
+                        case (ncr, Seq()) =>
                             cachedRoutes = CacheState.UpToDate(ncr)
                             publish(ncr)
                         case (ncr, events) =>
@@ -334,15 +319,8 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             synchronized {
                 Logger.info("ClusterRouter received recalculate request")
                 cachedRoutes match {
-                    case Empty => cachedRoutes = handleUpdating(Updating(None, recalculate(), Seq.empty))
-                    case UpToDate(routes, version) =>
-                        val updating = handleUpdating(Updating(Some(routes), recalculate(), Seq.empty))
-                        updating.routes.onSuccess{
-                            case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
-                        }
-                        updating.routes.onFailure{
-                            case e => client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
-                        }
+                    case Empty => cachedRoutes = handleUpdating(Updating(None, recalculate(), Seq(r)))
+                    case UpToDate(routes) => handleUpdating(Updating(Some(routes), recalculate(), Seq(r)))
                     case u: Updating => u.copy(events = u.events :+ r)
                 }
             }
