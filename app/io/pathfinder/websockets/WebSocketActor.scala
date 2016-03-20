@@ -7,11 +7,12 @@ import io.pathfinder.routing.Router
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
 import io.pathfinder.websockets.pushing.PushSubscriber
-
 import play.Logger
 import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
-
+import java.util.UUID
 import scala.util.Try
+import io.pathfinder.authentication.AuthServer
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object WebSocketActor {
     val controllers: Map[ModelType, WebSocketController] = Map(
@@ -25,7 +26,7 @@ object WebSocketActor {
         ModelTypes.Commodity -> Commodity.Dao
     )
 
-    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app))
+    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app, UUID.randomUUID().toString()))
 }
 
 /**
@@ -34,16 +35,26 @@ object WebSocketActor {
  */
 class WebSocketActor (
     client: ActorRef,
-    app: String
+    app: String,
+    id: String
 ) extends Actor {
     import WebSocketActor.{controllers, observers}
 
-    override def receive: PartialFunction[Any, Unit] = {
+    client ! ConnectionId(id)
+
+    def receive: Receive = {
+        case Authenticate(opt) =>
+            val res = AuthServer.connection(id)
+            res.onSuccess{case x => client ! Authenticated(id); context.become(authenticated)}
+            res.onFailure{case e => e.printStackTrace(); client ! Error(e.getMessage)}
+        case m: WebSocketMessage => client ! Error("Not Authenticated")
+    }
+
+    private val authenticated: Receive = {
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
             m.withApp(app).getOrElse{
-                client ! Error("Unable to parse cluster id")
-                return PartialFunction.empty
+                Error("Unable to parse cluster id")
             } match {
                 case Route(id) =>
                     if(!Router.routeRequest(client, id)) {
@@ -90,7 +101,6 @@ class WebSocketActor (
                     observers.foreach(_._2.unsubscribe(client))
                     client ! Unsubscribed(None,None,None).withoutApp
 
-
                 // unsubscribe from a specified cluster
                 case Unsubscribe(Some(cId), None, None) =>
                     observers.foreach(_._2.unsubscribeByClusterPath(cId, client))
@@ -123,6 +133,8 @@ class WebSocketActor (
                     client ! Error("An unsubscribe message must either have a model id and model type, cluster id and model type, a cluster id, or be empty")
 
                 case UnknownMessage(value) => client ! Error("Received unknown message: " + value.toString)
+
+                case e: Error => client ! e
 
                 case x => client ! Error("received unhandled message: "+ x.toString)
             }
