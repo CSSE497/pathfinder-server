@@ -473,6 +473,19 @@ object WebSocketMessage {
     }
     addComp(Recalculated)
 
+    case class ConnectionId(
+        id: String
+    ) extends WebSocketMessage {
+        override type M = ConnectionId
+        override def companion = ConnectionId
+    }
+
+    object ConnectionId extends MessageCompanion[ConnectionId] {
+        override def message = "ConnectionId"
+        override def format: Format[ConnectionId] = Json.format[ConnectionId]
+    }
+    addComp(ConnectionId)
+
     val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
 
     Logger.info("stringToMessage: [" + stringToMessage.keys.mkString("|")+"]")
