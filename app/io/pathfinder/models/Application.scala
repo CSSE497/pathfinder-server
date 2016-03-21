@@ -48,6 +48,9 @@ class Application extends Model {
     @ManyToOne
     var objectiveFunction: ObjectiveFunction = null
 
+    @Column
+    var key: String = null
+
     def cluster: Cluster = {
         Cluster.finder.byId(id)
     }
