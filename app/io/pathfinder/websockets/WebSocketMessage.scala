@@ -484,8 +484,6 @@ object WebSocketMessage {
     }
     addComp(ConnectionId)
 
-    val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
-
     case class Authenticate(
         value: Option[JsValue]
     ) extends WebSocketMessage {
@@ -509,6 +507,8 @@ object WebSocketMessage {
         override def format: Format[Authenticated] = Json.format[Authenticated]
     }
     addComp(Authenticated)
+
+    val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
 
     Logger.info("stringToMessage: [" + stringToMessage.keys.mkString("|")+"]")
 
