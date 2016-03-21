@@ -13,6 +13,8 @@ import java.util.UUID
 import scala.util.Try
 import io.pathfinder.authentication.AuthServer
 import scala.concurrent.ExecutionContext.Implicits.global
+import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
+import play.api.libs.functional.syntax._
 
 object WebSocketActor {
     val controllers: Map[ModelType, WebSocketController] = Map(
@@ -43,10 +45,16 @@ class WebSocketActor (
     client ! ConnectionId(id)
 
     def receive: Receive = {
-        case Authenticate(opt) =>
-            val res = AuthServer.connection(id)
-            res.onSuccess{case x => client ! Authenticated(id); context.become(authenticated)}
-            res.onFailure{case e => e.printStackTrace(); client ! Error(e.getMessage)}
+        case Authenticate(opt) => opt.fold{client ! Error("No Email Provided")}{
+            x => x.validate(__.read[String]).fold(
+                { case invalid => client ! Error("invalid json: " + x.toString()) },
+                { case email =>
+                    val res = AuthServer.connection(id, email)
+                    res.onSuccess{ case x => client ! Authenticated(id); context.become(authenticated) }
+                    res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
+                }
+            )
+        }
         case m: WebSocketMessage => client ! Error("Not Authenticated")
     }
 

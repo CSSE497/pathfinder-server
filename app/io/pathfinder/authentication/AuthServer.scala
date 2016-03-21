@@ -6,36 +6,70 @@ import play.api.Play.current
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.JsValue
 import scala.concurrent.{Future, Promise}
-import io.jsonwebtoken.{Jwts,Claims}
 import java.util.Base64
-import io.jsonwebtoken.JwtParser
+import io.pathfinder.models.Application
 import java.util.Date
+import play.Logger
+
+import java.security.KeyFactory
+import java.security.interfaces.RSAPublicKey
+import java.security.spec.X509EncodedKeySpec
+import java.security.PublicKey
+import java.util.Base64
+
+import com.nimbusds.jose.crypto.RSASSAVerifier
+import com.nimbusds.jwt.{JWTClaimsSet,SignedJWT}
 
 object AuthServer {
-    private val connectionUrl = Play.current.configuration.getString("authServer.connection").get
-    private val certificateUrl = Play.current.configuration.getString("authServer.certificateUrl").get
-    private var publicKey: String = null
+    val connection = Play.current.configuration.getString("AuthServer.connection").get
+    val certificate = Play.current.configuration.getString("AuthServer.certificate").get
+    val audience = Play.current.configuration.getString("AuthServer.audience").get
+    val issuer = Play.current.configuration.getString("AuthServer.issuer").get
+    private var verifier: RSASSAVerifier = null
 
     for {
-        response <- WS.url(certificateUrl).get()
+        response <- WS.url(certificate).get()
     } yield {
-        val str = new String(response.bodyAsBytes,"UTF-8").replaceAll("(-+BEGIN PUBLIC KEY-+\\r?\\n|-+END PUBLIC KEY-+\\r?\\n?)", "")
-        publicKey = new String(Base64.getDecoder.decode(str), "UTF-8")
+        try {
+            Logger.info("Received auth server key")
+            Logger.info(response.body)
+            val pub = new String(response.bodyAsBytes, "UTF-8").replaceAll("-----BEGIN PUBLIC KEY-----\n|-----END PUBLIC KEY-----|\n", "");
+            val decoded = Base64.getDecoder.decode(pub)
+            val spec = new X509EncodedKeySpec(decoded)
+            val kf = KeyFactory.getInstance("RSA")
+            val publicKey = kf.generatePublic(spec).asInstanceOf[RSAPublicKey]
+            verifier = new RSASSAVerifier(publicKey)
+        } catch {
+            case e: Throwable =>
+                Logger.error("Failed to load auth server key", e)
+                System.exit(1)
+        }
     }
 
-    def connection(id: String): Future[Unit] = for {
-        res <- WS.url(connectionUrl).withQueryString("connection_id" -> id).get()
-        token = new String(res.bodyAsBytes,"UTF-8")
+    def connection(id: String, email: String): Future[Unit] = for {
+        res <- WS.url(connection).withQueryString("connection_id" -> id).get()
     } yield {
-        val parser = Jwts.parser()
-        parser.requireAudience("https://api.thepathfinder.xyz")
-        parser.requireAudience(id)
-        val claims: Claims = parser.parseClaimsJwt(new String(res.bodyAsBytes,"UTF-8")).getBody
-        if(claims.getExpiration.before(new Date())){
-            throw new Exception("expired token")
+        Logger.info(verifier.toString())
+        val token = SignedJWT.parse(new String(res.bodyAsBytes,"UTF-8"))
+        if(!token.verify(verifier)){
+            throw new IllegalArgumentException("Invalid Token")
         }
-        if(claims.getIssuer == "https://auth.thepathfinder.xyz"){
-            parser.setSigningKey(publicKey).parse(token)
+        val claims = token.getJWTClaimsSet
+        if(claims.getExpirationTime.before(new Date())){
+            throw new IllegalArgumentException("expired token")
+        }
+        if(!claims.getAudience.contains(audience)){
+            throw new IllegalArgumentException(audience + " required in aud claim")
+        }
+        if(claims.getIssuer() != issuer){
+            throw new IllegalArgumentException(issuer + " required in iss claim")
+        }
+        val email = claims.getClaim("email")
+        if(email == null){
+            throw new IllegalArgumentException("No Email");
+        }
+        if(claims.getClaim("email").toString() != email){
+            throw new IllegalArgumentException("invalid email")
         }
     }
 }
