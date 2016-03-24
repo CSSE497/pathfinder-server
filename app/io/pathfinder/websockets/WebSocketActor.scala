@@ -1,8 +1,8 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, VehicleId}
-import io.pathfinder.models.{Vehicle, Commodity}
+import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, TransportId}
+import io.pathfinder.models.{Transport, Commodity}
 import io.pathfinder.routing.Router
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
@@ -18,13 +18,13 @@ import play.api.libs.functional.syntax._
 
 object WebSocketActor {
     val controllers: Map[ModelType, WebSocketController] = Map(
-        ModelTypes.Vehicle -> VehicleSocketController,
+        ModelTypes.Transport -> VehicleSocketController,
         ModelTypes.Cluster -> ClusterSocketController,
         ModelTypes.Commodity -> CommoditySocketController
     )
 
     val observers: Map[ModelType, PushSubscriber] = Map(
-        ModelTypes.Vehicle -> Vehicle.Dao,
+        ModelTypes.Transport -> Transport.Dao,
         ModelTypes.Commodity -> Commodity.Dao
     )
 
@@ -81,8 +81,8 @@ class WebSocketActor (
                 case Subscribe(None, _model, Some(id)) =>
                     client ! {
                         id match {
-                            case VehicleId(vId) =>
-                                observers(ModelTypes.Vehicle).subscribeById(vId, client)
+                            case TransportId(vId) =>
+                                observers(ModelTypes.Transport).subscribeById(vId, client)
                                 Subscribed(None, None, Some(id)).withoutApp
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).subscribeById(cId, client)
@@ -126,8 +126,8 @@ class WebSocketActor (
                 case Unsubscribe(None, modelType, Some(id)) =>
                     client ! {
                         id match {
-                            case VehicleId(vId) =>
-                                observers(ModelTypes.Vehicle).unsubscribeById(vId, client)
+                            case TransportId(vId) =>
+                                observers(ModelTypes.Transport).unsubscribeById(vId, client)
                                 Unsubscribed(None, modelType, Some(id)).withoutApp
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).unsubscribeById(cId, client)

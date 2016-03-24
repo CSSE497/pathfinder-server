@@ -1,6 +1,6 @@
 package io.pathfinder.routing
 
-import io.pathfinder.models.{Vehicle, Commodity}
+import io.pathfinder.models.{Transport, Commodity}
 import play.api.libs.json._
 
 sealed abstract class Action(val name: String) {
@@ -14,7 +14,7 @@ object Action {
         latitude: Double,
         longitude: Double
     ) extends Action("Start") {
-        def this(v: Vehicle) = this(
+        def this(v: Transport) = this(
             v.latitude,
             v.longitude
         )

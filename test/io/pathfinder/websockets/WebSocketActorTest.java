@@ -8,8 +8,8 @@ import akka.testkit.TestProbe;
 import io.pathfinder.BaseAppTest;
 import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Commodity;
-import io.pathfinder.models.Vehicle;
-import io.pathfinder.models.VehicleStatus;
+import io.pathfinder.models.Transport;
+import io.pathfinder.models.TransportStatus;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -37,9 +37,9 @@ public class WebSocketActorTest extends BaseAppTest {
                     "\"value\":{" +
                         "\"id\":\"" + ROOT + "/subcluster\"" +
                     "}}");
-    private static final JsValue JSON_CREATE_VEHICLE =
+    private static final JsValue JSON_CREATE_TRANSPORT =
         Json.parse("{\"message\":\"Create\"," +
-                    "\"model\":\"Vehicle\"," +
+                    "\"model\":\"Transport\"," +
                     "\"value\":{" +
                         "\"latitude\":0.1," +
                         "\"longitude\":-12.3," +
@@ -80,20 +80,20 @@ public class WebSocketActorTest extends BaseAppTest {
     }
 
     @Test
-    public void testCreateVehicle() {
+    public void testCreateTransport() {
         final int NEXT_UNUSED_ID = 1;
-        Patterns.ask(socket, WebSocketMessage.format().reads(JSON_CREATE_VEHICLE).get(), TIMEOUT);
-        Vehicle createdVehicle = new Vehicle();
-        createdVehicle.id_$eq(NEXT_UNUSED_ID);
-        createdVehicle.latitude_$eq(0.1);
-        createdVehicle.longitude_$eq(-12.3);
+        Patterns.ask(socket, WebSocketMessage.format().reads(JSON_CREATE_TRANSPORT).get(), TIMEOUT);
+        Transport createdTransport = new Transport();
+        createdTransport.id_$eq(NEXT_UNUSED_ID);
+        createdTransport.latitude_$eq(0.1);
+        createdTransport.longitude_$eq(-12.3);
         Map<String,JsValue> meta = new HashMap<>();
         meta.put("capacity", new JsNumber(BigDecimal.valueOf(99)));
-        createdVehicle.metadata_$eq(new JsObject(meta));
-        createdVehicle.status_$eq(VehicleStatus.Online);
-        createdVehicle.cluster_$eq(baseCluster());
+        createdTransport.metadata_$eq(new JsObject(meta));
+        createdTransport.status_$eq(TransportStatus.Online);
+        createdTransport.cluster_$eq(baseCluster());
         client.expectMsg(new WebSocketMessage.Created(
-                ModelTypes.Vehicle(), Vehicle.format().writes(createdVehicle)));
+                ModelTypes.Transport(), Transport.format().writes(createdTransport)));
     }
 
     @Test

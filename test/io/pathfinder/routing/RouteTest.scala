@@ -1,6 +1,6 @@
 package io.pathfinder.routing
 
-import io.pathfinder.models.{Cluster, Application, CommodityStatus, VehicleStatus, Vehicle, Commodity}
+import io.pathfinder.models.{Cluster, Application, CommodityStatus, TransportStatus, Transport, Commodity}
 import io.pathfinder.routing.Action.{DropOff, PickUp, Start}
 import org.scalatestplus.play.PlaySpec
 import org.specs2.execute
@@ -30,7 +30,7 @@ class RouteTest extends PlaySpec {
     }
 
     val routeJson = Json.parse(s"""{
-        "vehicle":{"id":9,"latitude":2,"longitude":3,"status":"Online","metadata":{"capacity":1},"commodities":[],"clusterId":"$ROOT"},
+        "transport":{"id":9,"latitude":2,"longitude":3,"status":"Online","metadata":{"capacity":1},"commodities":[],"clusterId":"$ROOT"},
         "actions":[
             { "action":"Start","latitude":12,"longitude":18},
             { "action":"PickUp",
@@ -70,8 +70,8 @@ class RouteTest extends PlaySpec {
             val actions = coms.foldLeft(Seq.newBuilder[Action]+=Start(12,18)) {
                 (b,c) => b += new PickUp(c) += new DropOff(c)
             }.result()
-            val vehicle = Vehicle(9, 2, 3, VehicleStatus.Online,JsObject(Seq("capacity" -> JsNumber(1))), None, APP_ID)
-            val route = Route(vehicle,actions)
+            val transport = Transport(9, 2, 3, TransportStatus.Online,JsObject(Seq("capacity" -> JsNumber(1))), None, APP_ID)
+            val route = Route(transport,actions)
             Route.writes.writes(route) mustBe routeJson
         }
     }

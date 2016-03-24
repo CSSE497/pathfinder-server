@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import akka.event.{SubchannelClassification, ActorEventBus}
 import akka.util.{Subclassification, Timeout}
 import io.pathfinder.config.Global
-import io.pathfinder.models.{ModelId, HasCluster, Cluster, Commodity, Vehicle}
+import io.pathfinder.models.{ModelId, HasCluster, Cluster, Commodity, Transport}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{RouteRequest, ClusterEvent}
 import io.pathfinder.websockets.pushing.EventBusActor.EventBusMessage.Subscribe
@@ -63,8 +63,8 @@ object Router extends ActorEventBus with SubchannelClassification {
     override protected def publish(event: Event, subscriber: ActorRef): Unit = subscriber ! event._2
 
     private def clusterFromId(id: ModelId): Option[Cluster] = id match {
-        case ModelId.VehicleId(vId) =>
-            Vehicle.Dao.read(vId).map(_.cluster)
+        case ModelId.TransportId(vId) =>
+            Transport.Dao.read(vId).map(_.cluster)
         case ModelId.CommodityId(cId) =>
             Commodity.Dao.read(cId).map(_.cluster)
         case ModelId.ClusterPath(path) =>

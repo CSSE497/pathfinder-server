@@ -11,34 +11,34 @@ import javax.persistence.{CascadeType, OneToMany, Enumerated, JoinColumn, ManyTo
 import play.api.libs.json.{JsObject, Writes, Format, Json}
 import scala.collection.JavaConverters.{asScalaBufferConverter, seqAsJavaListConverter}
 
-object Vehicle {
+object Transport {
 
-    val finder: Model.Find[Long,Vehicle] = new Model.Finder[Long,Vehicle](classOf[Vehicle])
+    val finder: Model.Find[Long, Transport] = new Model.Finder[Long, Transport](classOf[Transport])
 
-    object Dao extends WebSocketDao[Vehicle](finder) {
+    object Dao extends WebSocketDao[Transport](finder) {
 
-        override def modelType: ModelTypes.Value = ModelTypes.Vehicle
+        override def modelType: ModelTypes.Value = ModelTypes.Transport
 
-        override def writer: Writes[Vehicle] = Vehicle.format
+        override def writer: Writes[Transport] = Transport.format
     }
 
-    implicit val statusFormat: Format[VehicleStatus] = VehicleStatus.format
-    implicit val format: Format[Vehicle] = Json.format[Vehicle]
+    implicit val statusFormat: Format[TransportStatus] = TransportStatus.format
+    implicit val format: Format[Transport] = Json.format[Transport]
 
-    implicit val resourceFormat: Format[VehicleResource] = Json.format[VehicleResource]
+    implicit val resourceFormat: Format[TransportResource] = Json.format[TransportResource]
 
-    case class VehicleResource(
+    case class TransportResource(
         id:        Option[Long],
         latitude:  Option[Double],
         longitude: Option[Double],
         clusterId: Option[String],
-        status:    Option[VehicleStatus],
+        status:    Option[TransportStatus],
         metadata:  Option[JsObject]
-    ) extends Resource[Vehicle] {
+    ) extends Resource[Transport] {
 
-        override type R = VehicleResource
+        override type R = TransportResource
 
-        override def update(v: Vehicle): Option[Vehicle] = {
+        override def update(v: Transport): Option[Transport] = {
             latitude.foreach(v.latitude = _)
             longitude.foreach(v.longitude = _)
             status.foreach(v.status = _)
@@ -50,32 +50,32 @@ object Vehicle {
             Some(v)
         }
 
-        def create(c: Cluster): Option[Vehicle] = {
+        def create(c: Cluster): Option[Transport] = {
             for {
                 lat <- latitude
                 lng <- longitude
             } yield {
-                val stat = status.getOrElse(VehicleStatus.Offline)
+                val stat = status.getOrElse(TransportStatus.Offline)
                 val met = metadata.getOrElse(JsObject(Seq.empty))
-                val v = Vehicle(id.getOrElse(0), lat, lng, stat, met, None, c.id)
+                val v = Transport(id.getOrElse(0), lat, lng, stat, met, None, c.id)
                 v.cluster = c
                 v
             }
         }
 
-        override def create: Option[Vehicle] = for {
+        override def create: Option[Transport] = for {
             id <- clusterId
             cluster <- Cluster.Dao.read(id)
             mod <- create(cluster)
         } yield mod
 
-        override def withAppId(appId: String): Option[VehicleResource] = Some(
+        override def withAppId(appId: String): Option[TransportResource] = Some(
             copy(
                 clusterId = clusterId.map(Cluster.addAppToPath(_, appId).getOrElse(return None))
             )
         )
 
-        override def withoutAppId: VehicleResource = copy(
+        override def withoutAppId: TransportResource = copy(
             clusterId = clusterId.map(Cluster.removeAppFromPath)
         )
     }
@@ -84,12 +84,12 @@ object Vehicle {
         id: Long,
         latitude: Double,
         longitude: Double,
-        status: VehicleStatus,
+        status: TransportStatus,
         metadata: JsObject,
         commodities: Option[Seq[Commodity]],
         clusterId: String
-    ): Vehicle = {
-        val v = new Vehicle
+    ): Transport = {
+        val v = new Transport
         v.id = id
         v.latitude = latitude
         v.longitude = longitude
@@ -102,7 +102,7 @@ object Vehicle {
         v
     }
 
-    def unapply(v: Vehicle): Option[(Long, Double, Double, VehicleStatus, JsObject, Option[Seq[Commodity]], String)] =
+    def unapply(v: Transport): Option[(Long, Double, Double, TransportStatus, JsObject, Option[Seq[Commodity]], String)] =
         Some((
             v.id,
             v.latitude,
@@ -115,7 +115,7 @@ object Vehicle {
 }
 
 @Entity
-class Vehicle() extends Model with HasId with HasCluster {
+class Transport() extends Model with HasId with HasCluster {
 
     @Id
     @Column(nullable = false)
@@ -134,7 +134,7 @@ class Vehicle() extends Model with HasId with HasCluster {
 
     @Column(nullable=false)
     @Enumerated
-    var status: VehicleStatus = VehicleStatus.Offline
+    var status: TransportStatus = TransportStatus.Offline
 
     @Column(length = 255)
     var metadata: JsObject = JsObject(Seq.empty)
