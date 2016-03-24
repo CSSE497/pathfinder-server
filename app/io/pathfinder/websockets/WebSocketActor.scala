@@ -49,8 +49,8 @@ class WebSocketActor (
             x => x.validate(__.read[String]).fold(
                 { case invalid => client ! Error("invalid json: " + x.toString()) },
                 { case email =>
-                    val res = AuthServer.connection(id, email)
-                    res.onSuccess{ case x => client ! Authenticated(id); context.become(authenticated) }
+                    val res = AuthServer.connection(id)
+                    res.onSuccess{ case x => client ! Authenticated(None); context.become(authenticated) }
                     res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
                 }
             )

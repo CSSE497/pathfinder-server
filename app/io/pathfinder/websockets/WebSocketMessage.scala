@@ -497,7 +497,7 @@ object WebSocketMessage {
     }
     addComp(Authenticate)
 
-    case class Authenticated(id: String) extends WebSocketMessage {
+    case class Authenticated(id: Option[String]) extends WebSocketMessage {
         override type M = Authenticated
         override def companion = Authenticated
     }

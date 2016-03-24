@@ -46,7 +46,7 @@ object AuthServer {
         }
     }
 
-    def connection(id: String, email: String): Future[Unit] = for {
+    def connection(id: String): Future[Unit] = for {
         res <- WS.url(connection).withQueryString("connection_id" -> id).get()
     } yield {
         Logger.info(verifier.toString())
@@ -63,13 +63,6 @@ object AuthServer {
         }
         if(claims.getIssuer() != issuer){
             throw new IllegalArgumentException(issuer + " required in iss claim")
-        }
-        val email = claims.getClaim("email")
-        if(email == null){
-            throw new IllegalArgumentException("No Email");
-        }
-        if(claims.getClaim("email").toString() != email){
-            throw new IllegalArgumentException("invalid email")
         }
     }
 }
