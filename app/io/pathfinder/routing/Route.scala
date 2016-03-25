@@ -6,7 +6,7 @@ import play.api.libs.json.Json
 
 import scala.collection.mutable
 
-case class Route(vehicle: Transport, actions: Seq[Action]) {
+case class Route(transport: Transport, actions: Seq[Action]) {
     def this(v: Transport) = this(v,Seq(new Start(v)))
 }
 
@@ -28,6 +28,6 @@ object Route {
     }
     import Action.writes
     import Transport.format
-    def newBuilder(vehicle: Transport): mutable.Builder[Action,Route] = new RouteBuilder(vehicle)
+    def newBuilder(transport: Transport): mutable.Builder[Action,Route] = new RouteBuilder(transport)
     val writes = Json.writes[Route]
 }

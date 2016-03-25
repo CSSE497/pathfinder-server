@@ -161,7 +161,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
 
     def vehicleRouted(route: Route): Routed = Routed(
         ModelTypes.Transport,
-        Transport.format.writes(route.vehicle),
+        Transport.format.writes(route.transport),
         Route.writes.writes(route),
         None
     )
@@ -172,10 +172,10 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
             cr.routes.foreach { route =>
                 val routeJson: JsValue = Route.writes.writes(route)
-                val vehicleJson: JsValue = Transport.format.writes(route.vehicle)
+                val vehicleJson: JsValue = Transport.format.writes(route.transport)
 
                 // publish vehicles to vehicle subscribers
-                publish((ModelId.TransportId(route.vehicle.id), Routed(ModelTypes.Transport, vehicleJson, routeJson, None)))
+                publish((ModelId.TransportId(route.transport.id), Routed(ModelTypes.Transport, vehicleJson, routeJson, None)))
                 route.actions.tail.collect {
                     case PickUp(lat, lng, com) =>
                         val comJson = Commodity.format.writes(com) // publish commodities to commodity subscribers
@@ -208,7 +208,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 Logger.info("vehicle Updated received: " + e)
                 Logger.info("for route: " + cr)
                 if (TransportStatus.Offline.equals(v.status)) {
-                    if (cr.routes.exists(_.vehicle.id == v.id)) {
+                    if (cr.routes.exists(_.transport.id == v.id)) {
                         None
                     } else {
                         Some(cr)
@@ -217,9 +217,9 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     var found = 0
                     val replacement = cr.routes.map {
                         route =>
-                            if (route.vehicle.id == v.id) {
+                            if (route.transport.id == v.id) {
                                 found += 1
-                                route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
+                                route.copy(transport = v, actions = new Action.Start(v) +: route.actions.tail)
                             } else route
                     }
                     if (found == 1) {
@@ -329,7 +329,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         }.foreach { rc =>
             mId match {
                 case ModelId.ClusterPath(path) => client ! rc.routed
-                case ModelId.TransportId(id) => rc.routes.find(_.vehicle.id == id).foreach { route =>
+                case ModelId.TransportId(id) => rc.routes.find(_.transport.id == id).foreach { route =>
                     client ! vehicleRouted(route).withoutApp
                 }
                 case ModelId.CommodityId(id) =>
