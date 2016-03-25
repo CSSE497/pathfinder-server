@@ -4,6 +4,7 @@ import akka.actor.{Props, Actor, ActorRef}
 import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, TransportId}
 import io.pathfinder.models.{Transport, Commodity}
 import io.pathfinder.routing.Router
+import play.api.Play
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
 import io.pathfinder.websockets.pushing.PushSubscriber
@@ -17,6 +18,8 @@ import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.libs.functional.syntax._
 
 object WebSocketActor {
+    private val authenticate = Play.current.configuration.getBoolean("authenticate").getOrElse(false)
+
     val controllers: Map[ModelType, WebSocketController] = Map(
         ModelTypes.Transport -> VehicleSocketController,
         ModelTypes.Cluster -> ClusterSocketController,
@@ -40,9 +43,7 @@ class WebSocketActor (
     app: String,
     id: String
 ) extends Actor {
-    import WebSocketActor.{controllers, observers}
-
-    client ! ConnectionId(id)
+    import WebSocketActor.{controllers, observers, authenticate}
 
     def receive: Receive = {
         case Authenticate(opt) => opt.fold{client ! Error("No Email Provided")}{
@@ -151,4 +152,12 @@ class WebSocketActor (
             client ! Error("Unhandled Exception: " + e.getMessage + " : " + e.getStackTrace.mkString("\n\t"))
         }
     }
+
+    // we could check application options here to see if they want authentication, for now we'll use application.conf
+    if(authenticate) {
+        client ! ConnectionId(id)
+    } else {
+        context.become(authenticated)
+    }
+
 }

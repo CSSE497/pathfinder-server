@@ -2,6 +2,10 @@ package io.pathfinder;
 
 import io.pathfinder.models.Cluster;
 import io.pathfinder.models.Application;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.After;
 import org.junit.Before;
 import play.test.FakeApplication;
@@ -25,7 +29,9 @@ public class BaseAppTest {
 
     @Before
     public void startApp() {
-        app = Helpers.fakeApplication(Helpers.inMemoryDatabase());
+    	Map<String,String> conf = new HashMap<>(Helpers.inMemoryDatabase());
+    	conf.put("Authenticate", "false");
+        app = Helpers.fakeApplication(conf);
         Helpers.start(app);
         PATHFINDER_APPLICATION.id_$eq(APPLICATION_ID);
         PATHFINDER_APPLICATION.name_$eq("MY COOL APP");
