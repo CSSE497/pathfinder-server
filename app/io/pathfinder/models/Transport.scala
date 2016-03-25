@@ -139,12 +139,12 @@ class Transport() extends Model with HasId with HasCluster {
     @Column(length = 255)
     var metadata: JsObject = JsObject(Seq.empty)
 
-    @OneToMany(mappedBy = "vehicle", cascade=Array(CascadeType.ALL))
+    @OneToMany(mappedBy = "transport", cascade=Array(CascadeType.ALL))
     var commodityList: java.util.List[Commodity] = new util.ArrayList[Commodity]()
 
     def commodities: Seq[Commodity] = commodityList.asScala
 
     override def toString = {
-        "Vehicle(" + id + ", " + latitude + ", " + longitude + ", " + status + ", " + metadata +")"
+        "Transport(" + id + ", " + latitude + ", " + longitude + ", " + status + ", " + metadata +")"
     }
 }
