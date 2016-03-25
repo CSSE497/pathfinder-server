@@ -7,5 +7,5 @@ import io.pathfinder.util.HasFormat
  */
 object ModelTypes extends Enumeration with HasFormat {
     type ModelType = Value
-    val Vehicle, Commodity, Cluster = Value
+    val Transport, Commodity, Cluster = Value
 }

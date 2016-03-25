@@ -34,7 +34,7 @@ object Commodity {
         status: Option[CommodityStatus],
         metadata: Option[JsObject],
         clusterId: Option[String],
-        vehicleId: Option[Long]
+        transportId: Option[Long]
     ) extends Resource[Commodity] {
         override type R = CommodityResource
 
@@ -48,12 +48,12 @@ object Commodity {
                 newStatus =>
                     c.status = newStatus
                     if (c.status.equals(CommodityStatus.PickedUp)) {
-                        vehicleId.orElse(return None).foreach { id => c.vehicle = Vehicle.Dao.read(id).getOrElse(return None) }
+                        transportId.orElse(return None).foreach { id => c.transport = Transport.Dao.read(id).getOrElse(return None) }
                     } else {
                         if (CommodityStatus.Waiting.equals(newStatus)) {
                             c.requestTime = new Date
                         }
-                        c.vehicle = null // don't know what should happen here
+                        c.transport = null // don't know what should happen here
                     }
             }
             Some(c)
@@ -74,7 +74,7 @@ object Commodity {
                     endLongitude,
                     stat,
                     metadata.getOrElse(JsObject(Seq.empty)),
-                    vehicleId,
+                    transportId,
                     cluster.id
                 )
                 c.cluster = cluster
@@ -110,7 +110,7 @@ object Commodity {
         endLongitude: Double,
         status: CommodityStatus,
         metadata: JsObject,
-        vehicleId: Option[Long],
+        transportId: Option[Long],
         clusterId: String
     ): Commodity = {
         val c = new Commodity
@@ -121,8 +121,8 @@ object Commodity {
         c.endLongitude = endLongitude
         c.status = status
         c.metadata = metadata
-        c.vehicle = vehicleId.flatMap{
-            vId => Vehicle.Dao.read(vId).orElse(throw new IllegalArgumentException("no vehicle with " + " id: " + vId))
+        c.transport = transportId.flatMap{
+            vId => Transport.Dao.read(vId).orElse(throw new IllegalArgumentException("no transport with " + " id: " + vId))
         }.orNull
         c.cluster = Cluster.Dao.read(clusterId).getOrElse(
             throw new IllegalArgumentException("No Cluster With Id: " + clusterId)
@@ -140,7 +140,7 @@ object Commodity {
             c.endLongitude,
             c.status,
             c.metadata,
-            Option(c.vehicle).map(_.id),
+            Option(c.transport).map(_.id),
             Cluster.removeAppFromPath(c.cluster.id)
         ))
 }
@@ -173,7 +173,7 @@ class Commodity() extends Model with HasId with HasCluster {
 
     @JoinColumn
     @ManyToOne(optional = true)
-    var vehicle: Vehicle = null
+    var transport: Transport = null
 
     @JoinColumn
     @ManyToOne

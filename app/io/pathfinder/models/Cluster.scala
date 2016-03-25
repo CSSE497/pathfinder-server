@@ -42,7 +42,7 @@ object Cluster {
 
     case class ClusterResource(
         id: Option[String],
-        vehicles: Option[Seq[Vehicle.VehicleResource]],
+        transports: Option[Seq[Transport.TransportResource]],
         commodities: Option[Seq[Commodity.CommodityResource]],
         subClusters: Option[Seq[ClusterResource]]
     ) extends Resource[Cluster] {
@@ -54,14 +54,14 @@ object Cluster {
         override def create: Option[Cluster] = {
             val model = new Cluster
             model.id = id.getOrElse(return None) // should validate path
-            vehicles.foreach(
+            transports.foreach(
                 _.foreach {
-                    vehicleResource => model.vehicleList.add(
+                    transportResource => model.transportList.add(
                         (for {
-                            id <- vehicleResource.id
-                            model <- Vehicle.Dao.read(id)
-                            update <- vehicleResource.update(model)
-                        } yield update).orElse(vehicleResource.create(model)).getOrElse(return None)
+                            id <- transportResource.id
+                            model <- Transport.Dao.read(id)
+                            update <- transportResource.update(model)
+                        } yield update).orElse(transportResource.create(model)).getOrElse(return None)
                     )
                 }
             )
@@ -82,7 +82,7 @@ object Cluster {
         override def withAppId(appId: String): Option[ClusterResource] = Some(
             copy(
                 id.map(Cluster.addAppToPath(_, appId).getOrElse(return None)),
-                vehicles.map(_.map(_.withAppId(appId).getOrElse(return None))),
+                transports.map(_.map(_.withAppId(appId).getOrElse(return None))),
                 commodities.map(_.map(_.withAppId(appId).getOrElse(return None))),
                 subClusters.map(_.map(_.withAppId(appId).getOrElse(return None)))
             )
@@ -90,25 +90,24 @@ object Cluster {
 
         override def withoutAppId: ClusterResource = copy(
             id.map(Cluster.removeAppFromPath),
-            vehicles.map(_.map(_.withoutAppId)),
+            transports.map(_.map(_.withoutAppId)),
             commodities.map(_.map(_.withoutAppId)),
             subClusters.map(_.map(_.withoutAppId))
         )
     }
 
-    def apply(id: String, vehicles: Seq[Vehicle], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
+    def apply(id: String, transports: Seq[Transport], commodities: Seq[Commodity], subClusters: Seq[Cluster]): Cluster = {
         val c = new Cluster
         c.id = id
-        c.vehicleList.addAll(vehicles.asJava)
+        c.transportList.addAll(transports.asJava)
         c.commodityList.addAll(commodities.asJava)
         c.unsavedSubclusters ++= subClusters
         c
     }
 
-    def unapply(c: Cluster): Option[(String, Seq[Vehicle], Seq[Commodity], Seq[Cluster])] =
-        Some((Cluster.removeAppFromPath(c.id), c.vehicles, c.commodities, c.subClusters.toSeq))
+    def unapply(c: Cluster): Option[(String, Seq[Transport], Seq[Commodity], Seq[Cluster])] =
+        Some((Cluster.removeAppFromPath(c.id), c.transports, c.commodities, c.subClusters.toSeq))
 }
-
 
 @Entity
 class Cluster() extends Model {
@@ -117,12 +116,12 @@ class Cluster() extends Model {
     var id: String = null
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
-    var vehicleList: util.List[Vehicle] = new util.ArrayList[Vehicle]()
+    var transportList: util.List[Transport] = new util.ArrayList[Transport]()
 
     @OneToMany(mappedBy = "cluster", cascade=Array(CascadeType.ALL))
     var commodityList: util.List[Commodity] = new util.ArrayList[Commodity]()
 
-    def vehicles: Seq[Vehicle] = vehicleList.asScala
+    def transports: Seq[Transport] = transportList.asScala
 
     def commodities: Seq[Commodity] = commodityList.asScala
 
@@ -173,8 +172,8 @@ class Cluster() extends Model {
     }
 
     override def toString = String.format(
-        "Cluster(id: %s, vehicles: %s, commodities: %s)",
+        "Cluster(id: %s, transports: %s, commodities: %s)",
         id,
-        util.Arrays.toString(vehicleList.toArray),
+        util.Arrays.toString(transportList.toArray),
         util.Arrays.toString(commodityList.toArray))
 }

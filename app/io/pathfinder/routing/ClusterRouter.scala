@@ -5,7 +5,7 @@ import akka.event.{ActorEventBus, LookupClassification}
 import com.avaje.ebean.Model
 import io.pathfinder.config.Global
 import io.pathfinder.models.ModelId.ClusterPath
-import io.pathfinder.models.{VehicleStatus, CommodityStatus, ModelId, Commodity, Vehicle, Cluster}
+import io.pathfinder.models.{TransportStatus, CommodityStatus, ModelId, Commodity, Transport, Cluster}
 import io.pathfinder.routing.Action.{DropOff, PickUp}
 import io.pathfinder.routing.ClusterRouter.CacheState.{Updating, UpToDate}
 import io.pathfinder.routing.ClusterRouter.ClusterRouterMessage.{Recalculate, RouteRequest, ClusterEvent}
@@ -160,8 +160,8 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     }
 
     def vehicleRouted(route: Route): Routed = Routed(
-        ModelTypes.Vehicle,
-        Vehicle.format.writes(route.vehicle),
+        ModelTypes.Transport,
+        Transport.format.writes(route.transport),
         Route.writes.writes(route),
         None
     )
@@ -172,10 +172,10 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
             cr.routes.foreach { route =>
                 val routeJson: JsValue = Route.writes.writes(route)
-                val vehicleJson: JsValue = Vehicle.format.writes(route.vehicle)
+                val vehicleJson: JsValue = Transport.format.writes(route.transport)
 
                 // publish vehicles to vehicle subscribers
-                publish((ModelId.VehicleId(route.vehicle.id), Routed(ModelTypes.Vehicle, vehicleJson, routeJson, None)))
+                publish((ModelId.TransportId(route.transport.id), Routed(ModelTypes.Transport, vehicleJson, routeJson, None)))
                 route.actions.tail.collect {
                     case PickUp(lat, lng, com) =>
                         val comJson = Commodity.format.writes(com) // publish commodities to commodity subscribers
@@ -204,11 +204,11 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     // returns Some(ClusterRoute) when the routes can be changed without a recalculation, otherwise it returns None
     private def handleEvent(e: ClusterEvent, cr: ClusterRoute): Option[ClusterRoute] =
         e match {
-            case ClusterEvent(Events.Updated, v: Vehicle) =>
+            case ClusterEvent(Events.Updated, v: Transport) =>
                 Logger.info("vehicle Updated received: " + e)
                 Logger.info("for route: " + cr)
-                if (VehicleStatus.Offline.equals(v.status)) {
-                    if (cr.routes.exists(_.vehicle.id == v.id)) {
+                if (TransportStatus.Offline.equals(v.status)) {
+                    if (cr.routes.exists(_.transport.id == v.id)) {
                         None
                     } else {
                         Some(cr)
@@ -217,9 +217,9 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     var found = 0
                     val replacement = cr.routes.map {
                         route =>
-                            if (route.vehicle.id == v.id) {
+                            if (route.transport.id == v.id) {
                                 found += 1
-                                route.copy(vehicle = v, actions = new Action.Start(v) +: route.actions.tail)
+                                route.copy(transport = v, actions = new Action.Start(v) +: route.actions.tail)
                             } else route
                     }
                     if (found == 1) {
@@ -303,7 +303,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             }
         case e: ClusterEvent =>
             if(e.model match {
-                case v: Vehicle => v.cluster.id == clusterPath
+                case v: Transport => v.cluster.id == clusterPath
                 case c: Commodity => c.cluster.id == clusterPath
                 case cl: Cluster => cl.id == clusterPath
             }) {
@@ -329,7 +329,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         }.foreach { rc =>
             mId match {
                 case ModelId.ClusterPath(path) => client ! rc.routed
-                case ModelId.VehicleId(id) => rc.routes.find(_.vehicle.id == id).foreach { route =>
+                case ModelId.TransportId(id) => rc.routes.find(_.transport.id == id).foreach { route =>
                     client ! vehicleRouted(route).withoutApp
                 }
                 case ModelId.CommodityId(id) =>
@@ -358,7 +358,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
 
     val matrixWriter: Writes[Matrix] = Writes.seq[Row] //Json.writes[Array[Array[Double]]]
 
-    def parseRoutingResponse(vehicles: Seq[Vehicle], commodities: Seq[Commodity], result: WSResponse): Try[Seq[Route]] =
+    def parseRoutingResponse(vehicles: Seq[Transport], commodities: Seq[Commodity], result: WSResponse): Try[Seq[Route]] =
         result.json.validate(
             (__ \ "routes").read(
                 Reads.seq(Reads.seq(Reads.JsNumberReads.map(_.value.toInt))).map(routes =>
@@ -389,7 +389,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             throw new scala.Error("NO CLUSTER WITH ID: " + clusterPath)
         }
         Logger.info("RECALCULATING")
-        val vehicles = cluster.vehicles.filter(v => VehicleStatus.Online.equals(v.status))
+        val vehicles = cluster.transports.filter(v => TransportStatus.Online.equals(v.status))
         val commodities = cluster.commodities.filter(
             c => CommodityStatus.Waiting.equals(c.status) || CommodityStatus.PickedUp.equals(c.status)
         )
@@ -436,7 +436,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 (
                     (num + commodities.size + 1).toString,
                     JsNumber(BigDecimal(
-                        Option(commodities(num).vehicle).map { vehicle =>
+                        Option(commodities(num).transport).map { vehicle =>
                             vehicles.zipWithIndex.find(kv => kv._1.id == vehicle.id).get._2 + 2 * commodities.size + 1
                         } getOrElse (num + 1)
                     ))

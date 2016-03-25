@@ -1,31 +1,37 @@
 package io.pathfinder.websockets
 
 import akka.actor.{Props, Actor, ActorRef}
-import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, VehicleId}
-import io.pathfinder.models.{Vehicle, Commodity}
+import io.pathfinder.models.ModelId.{ClusterPath, CommodityId, TransportId}
+import io.pathfinder.models.{Transport, Commodity}
 import io.pathfinder.routing.Router
+import play.api.Play
 import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
 import io.pathfinder.websockets.pushing.PushSubscriber
-
 import play.Logger
 import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
-
+import java.util.UUID
 import scala.util.Try
+import io.pathfinder.authentication.AuthServer
+import scala.concurrent.ExecutionContext.Implicits.global
+import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
+import play.api.libs.functional.syntax._
 
 object WebSocketActor {
+    private val authenticate = Play.current.configuration.getBoolean("authenticate").getOrElse(false)
+
     val controllers: Map[ModelType, WebSocketController] = Map(
-        ModelTypes.Vehicle -> VehicleSocketController,
+        ModelTypes.Transport -> VehicleSocketController,
         ModelTypes.Cluster -> ClusterSocketController,
         ModelTypes.Commodity -> CommoditySocketController
     )
 
     val observers: Map[ModelType, PushSubscriber] = Map(
-        ModelTypes.Vehicle -> Vehicle.Dao,
+        ModelTypes.Transport -> Transport.Dao,
         ModelTypes.Commodity -> Commodity.Dao
     )
 
-    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app))
+    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app, UUID.randomUUID().toString()))
 }
 
 /**
@@ -34,16 +40,30 @@ object WebSocketActor {
  */
 class WebSocketActor (
     client: ActorRef,
-    app: String
+    app: String,
+    id: String
 ) extends Actor {
-    import WebSocketActor.{controllers, observers}
+    import WebSocketActor.{controllers, observers, authenticate}
 
-    override def receive: PartialFunction[Any, Unit] = {
+    def receive: Receive = {
+        case Authenticate(opt) => opt.fold{client ! Error("No Email Provided")}{
+            x => x.validate(__.read[String]).fold(
+                { case invalid => client ! Error("invalid json: " + x.toString()) },
+                { case email =>
+                    val res = AuthServer.connection(id)
+                    res.onSuccess{ case x => client ! Authenticated(None); context.become(authenticated) }
+                    res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
+                }
+            )
+        }
+        case m: WebSocketMessage => client ! Error("Not Authenticated")
+    }
+
+    private val authenticated: Receive = {
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
             m.withApp(app).getOrElse{
-                client ! Error("Unable to parse cluster id")
-                return PartialFunction.empty
+                Error("Unable to parse cluster id")
             } match {
                 case Route(id) =>
                     if(!Router.routeRequest(client, id)) {
@@ -62,8 +82,8 @@ class WebSocketActor (
                 case Subscribe(None, _model, Some(id)) =>
                     client ! {
                         id match {
-                            case VehicleId(vId) =>
-                                observers(ModelTypes.Vehicle).subscribeById(vId, client)
+                            case TransportId(vId) =>
+                                observers(ModelTypes.Transport).subscribeById(vId, client)
                                 Subscribed(None, None, Some(id)).withoutApp
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).subscribeById(cId, client)
@@ -90,7 +110,6 @@ class WebSocketActor (
                     observers.foreach(_._2.unsubscribe(client))
                     client ! Unsubscribed(None,None,None).withoutApp
 
-
                 // unsubscribe from a specified cluster
                 case Unsubscribe(Some(cId), None, None) =>
                     observers.foreach(_._2.unsubscribeByClusterPath(cId, client))
@@ -108,8 +127,8 @@ class WebSocketActor (
                 case Unsubscribe(None, modelType, Some(id)) =>
                     client ! {
                         id match {
-                            case VehicleId(vId) =>
-                                observers(ModelTypes.Vehicle).unsubscribeById(vId, client)
+                            case TransportId(vId) =>
+                                observers(ModelTypes.Transport).unsubscribeById(vId, client)
                                 Unsubscribed(None, modelType, Some(id)).withoutApp
                             case CommodityId(cId) =>
                                 observers(ModelTypes.Commodity).unsubscribeById(cId, client)
@@ -124,6 +143,8 @@ class WebSocketActor (
 
                 case UnknownMessage(value) => client ! Error("Received unknown message: " + value.toString)
 
+                case e: Error => client ! e
+
                 case x => client ! Error("received unhandled message: "+ x.toString)
             }
         }.recover{ case e =>
@@ -131,4 +152,12 @@ class WebSocketActor (
             client ! Error("Unhandled Exception: " + e.getMessage + " : " + e.getStackTrace.mkString("\n\t"))
         }
     }
+
+    // we could check application options here to see if they want authentication, for now we'll use application.conf
+    if(authenticate) {
+        client ! ConnectionId(id)
+    } else {
+        context.become(authenticated)
+    }
+
 }

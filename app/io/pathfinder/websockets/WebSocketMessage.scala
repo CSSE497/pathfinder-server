@@ -257,7 +257,6 @@ object WebSocketMessage {
     }
     addComp(Update)
 
-
     /**
      * Sent by the client to delete the specified model
      */
@@ -291,7 +290,6 @@ object WebSocketMessage {
         override val format = simpleModelMessageFormat(Route.apply)
     }
     addComp(Route)
-
 
     private implicit val cFormat = io.pathfinder.models.Commodity.format
     /**
@@ -473,6 +471,43 @@ object WebSocketMessage {
     }
     addComp(Recalculated)
 
+    case class ConnectionId(
+        id: String
+    ) extends WebSocketMessage {
+        override type M = ConnectionId
+        override def companion = ConnectionId
+    }
+
+    object ConnectionId extends MessageCompanion[ConnectionId] {
+        override def message = "ConnectionId"
+        override def format: Format[ConnectionId] = Json.format[ConnectionId]
+    }
+    addComp(ConnectionId)
+
+    case class Authenticate(
+        value: Option[JsValue]
+    ) extends WebSocketMessage {
+        override type M = Authenticate
+        override def companion = Authenticate
+    }
+
+    object Authenticate extends MessageCompanion[Authenticate] {
+        override def message = "Authenticate"
+        override def format: Format[Authenticate] = Json.format[Authenticate]
+    }
+    addComp(Authenticate)
+
+    case class Authenticated(id: Option[String]) extends WebSocketMessage {
+        override type M = Authenticated
+        override def companion = Authenticated
+    }
+
+    object Authenticated extends MessageCompanion[Authenticated] {
+        override def message = "Authenticated"
+        override def format: Format[Authenticated] = Json.format[Authenticated]
+    }
+    addComp(Authenticated)
+
     val stringToMessage: Map[String, _ <: MessageCompanion[_]] = builder.result()
 
     Logger.info("stringToMessage: [" + stringToMessage.keys.mkString("|")+"]")
@@ -492,7 +527,7 @@ object WebSocketMessage {
                 ).asInstanceOf[WebSocketMessage]
             }.getOrElse(UnknownMessage(json)) },
             { msg =>
-                Logger.info("Sending Message: " + msg) 
+                Logger.info("Sending Message: " + msg)
                 (msg.message, msg.toJson) }
         )
 

@@ -20,7 +20,8 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % "9.4-1203-jdbc42",
   "com.jolbox" % "bonecp" % "0.8.0.RELEASE",
   "com.typesafe.akka" %% "akka-testkit" % "2.4.1",
-  "com.typesafe.akka" %% "akka-slf4j" % "2.4.1"
+  "com.typesafe.akka" %% "akka-slf4j" % "2.4.1",
+  "com.nimbusds" % "nimbus-jose-jwt" % "4.12"
 )
 
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-v", "-q", "-a")

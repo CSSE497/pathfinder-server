@@ -17,13 +17,13 @@ object ModelId {
     def read(model: ModelType, jsonId: JsValue): JsResult[ModelId] = model match {
         case ModelTypes.Commodity => CommodityId.format.reads(jsonId)
         case ModelTypes.Cluster => ClusterPath.format.reads(jsonId)
-        case ModelTypes.Vehicle => VehicleId.format.reads(jsonId)
+        case ModelTypes.Transport => TransportId.format.reads(jsonId)
     }
 
     def write(mId: ModelId): JsValue = mId match {
         case CommodityId(id) => JsNumber(id)
         case ClusterPath(path) => JsString(path)
-        case VehicleId(id) => JsNumber(id)
+        case TransportId(id) => JsNumber(id)
     }
 
     object CommodityId {
@@ -58,18 +58,17 @@ object ModelId {
             ClusterPath(Cluster.removeAppFromPath(path))
     }
 
-    object VehicleId {
-        val format: Format[VehicleId] = Format(
-            Reads.JsNumberReads.map(num => VehicleId.apply(num.value.toLong)),
-            Writes {
-                case VehicleId(id) => JsNumber(id)
+    object TransportId {
+        val format: Format[TransportId] = Format(
+            Reads.JsNumberReads.map(num => TransportId.apply(num.value.toLong)),            Writes {
+                case TransportId(id) => JsNumber(id)
             }
         )
     }
 
-    case class VehicleId(id: Long) extends LongId {
-        override type Id = VehicleId
-        override def modelType = ModelTypes.Vehicle
+    case class TransportId(id: Long) extends LongId {
+        override type Id = TransportId
+        override def modelType = ModelTypes.Transport
     }
 }
 
