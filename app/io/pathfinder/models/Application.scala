@@ -49,7 +49,7 @@ class Application extends Model {
     var objectiveFunction: ObjectiveFunction = null
 
     @Column
-    var key: String = null
+    var key: Array[Byte] = null
 
     def cluster: Cluster = {
         Cluster.finder.byId(id)
