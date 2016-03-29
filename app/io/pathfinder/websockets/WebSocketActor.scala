@@ -9,7 +9,7 @@ import io.pathfinder.websockets.ModelTypes.ModelType
 import io.pathfinder.websockets.WebSocketMessage._
 import io.pathfinder.websockets.pushing.PushSubscriber
 import play.Logger
-import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, VehicleSocketController}
+import io.pathfinder.websockets.controllers.{CommoditySocketController, ClusterSocketController, WebSocketController, TransportSocketController}
 import java.util.UUID
 import scala.util.Try
 import io.pathfinder.authentication.AuthServer
@@ -18,10 +18,10 @@ import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.libs.functional.syntax._
 
 object WebSocketActor {
-    private val authenticate = Play.current.configuration.getBoolean("authenticate").getOrElse(false)
+    private val authenticate = Play.current.configuration.getBoolean("Authenticate").getOrElse(false)
 
     val controllers: Map[ModelType, WebSocketController] = Map(
-        ModelTypes.Transport -> VehicleSocketController,
+        ModelTypes.Transport -> TransportSocketController,
         ModelTypes.Cluster -> ClusterSocketController,
         ModelTypes.Commodity -> CommoditySocketController
     )
@@ -31,7 +31,7 @@ object WebSocketActor {
         ModelTypes.Commodity -> Commodity.Dao
     )
 
-    def props(out: ActorRef, app: String) = Props(new WebSocketActor(out, app, UUID.randomUUID().toString()))
+    def props(out: ActorRef, app: String, useAuth: Boolean) = Props(new WebSocketActor(out, app, useAuth, UUID.randomUUID().toString()))
 }
 
 /**
@@ -41,20 +41,16 @@ object WebSocketActor {
 class WebSocketActor (
     client: ActorRef,
     app: String,
+    useAuth: Boolean,
     id: String
 ) extends Actor {
     import WebSocketActor.{controllers, observers, authenticate}
 
     def receive: Receive = {
-        case Authenticate(opt) => opt.fold{client ! Error("No Email Provided")}{
-            x => x.validate(__.read[String]).fold(
-                { case invalid => client ! Error("invalid json: " + x.toString()) },
-                { case email =>
-                    val res = AuthServer.connection(id)
-                    res.onSuccess{ case x => client ! Authenticated(None); context.become(authenticated) }
-                    res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
-                }
-            )
+        case Authenticate(opt) => {
+            val res = AuthServer.connection(id)
+            res.onSuccess{ case x => client ! Authenticated(None); context.become(authenticated) }
+            res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
         }
         case m: WebSocketMessage => client ! Error("Not Authenticated")
     }
@@ -91,7 +87,7 @@ class WebSocketActor (
                             case ClusterPath(path) =>
                                 observers.values.foreach(_.subscribeByClusterPath(path, client))
                                 Subscribed(Some(path), None, Some(id)).withoutApp
-                            case _Else => Error("Only subscriptions to vehicles and commodities are supported")
+                            case _Else => Error("Only subscriptions to transports and commodities are supported")
                         }
                     }
 
@@ -154,7 +150,7 @@ class WebSocketActor (
     }
 
     // we could check application options here to see if they want authentication, for now we'll use application.conf
-    if(authenticate) {
+    if(authenticate && useAuth) {
         client ! ConnectionId(id)
     } else {
         context.become(authenticated)

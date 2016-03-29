@@ -275,7 +275,7 @@ object WebSocketMessage {
     addComp(Delete)
 
     /**
-     * Request for when the client wants a route for a vehicle or commodity
+     * Request for when the client wants a route for a transport or commodity
      */
     case class Route(
         id: ModelId

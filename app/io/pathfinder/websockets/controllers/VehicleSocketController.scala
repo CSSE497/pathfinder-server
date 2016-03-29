@@ -7,7 +7,7 @@ import io.pathfinder.websockets.{WebSocketMessage, ModelTypes}
 import io.pathfinder.websockets.WebSocketMessage.{Route => RouteMsg, Error, Subscribe, Routed}
 import scala.collection.JavaConversions.asScalaBuffer
 /**
- * manages vehicle API calls
+ * manages transport API calls
  */
-object VehicleSocketController extends WebSocketCrudController[Long, Transport](ModelTypes.Transport,Transport.Dao)
+object TransportSocketController extends WebSocketCrudController[Long, Transport](ModelTypes.Transport,Transport.Dao)
 

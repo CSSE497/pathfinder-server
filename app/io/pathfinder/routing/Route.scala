@@ -11,19 +11,19 @@ case class Route(transport: Transport, actions: Seq[Action]) {
 }
 
 object Route {
-    private class RouteBuilder(vehicle: Transport) extends mutable.Builder[Action,Route] {
-        private val actions = Seq.newBuilder[Action] += new Action.Start(vehicle)
+    private class RouteBuilder(transport: Transport) extends mutable.Builder[Action,Route] {
+        private val actions = Seq.newBuilder[Action] += new Action.Start(transport)
 
         override def +=(elem: Action): RouteBuilder.this.type = {
             actions += elem
             this
         }
 
-        override def result(): Route = Route(vehicle, actions.result())
+        override def result(): Route = Route(transport, actions.result())
 
         override def clear(): Unit = {
             actions.clear()
-            actions += new Action.Start(vehicle)
+            actions += new Action.Start(transport)
         }
     }
     import Action.writes

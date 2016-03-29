@@ -8,7 +8,7 @@ import play.Logger
 import scala.concurrent.Future
 
 object Application {
-    private def handlerProps(appId: String): WebSocket.HandlerProps = WebSocketActor.props(_, appId)
+    private def handlerProps(appId: String, useAuth: Boolean): WebSocket.HandlerProps = WebSocketActor.props(_, appId, useAuth)
 }
 
 class Application extends Controller {
@@ -35,9 +35,11 @@ class Application extends Controller {
                 Some("7d8f2ead-ee48-45ef-8314-3c5bebd4db82")
             }.flatMap(
                 appId =>
-                    Option(io.pathfinder.models.Application.finder.byId(appId)).map(
-                        app => Right(handlerProps(appId))
-                    )
+                    Option(io.pathfinder.models.Application.finder.byId(appId)).map{
+                        app =>
+                            val useAuth = !request.getQueryString("auth").map("false".equals).getOrElse(false)
+			    Right(handlerProps(appId, useAuth))
+                    }
             ).getOrElse(Left(Results.Unauthorized))
         )
     }
