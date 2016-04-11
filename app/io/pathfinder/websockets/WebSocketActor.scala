@@ -16,6 +16,7 @@ import io.pathfinder.authentication.AuthServer
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.libs.functional.syntax._
+import io.pathfinder.authentication.AuthenticationStatus
 
 object WebSocketActor {
     private val authenticate = Play.current.configuration.getBoolean("authenticate").getOrElse(false)
@@ -50,8 +51,8 @@ class WebSocketActor (
             x => x.validate(__.read[String]).fold(
                 { case invalid => client ! Error("invalid json: " + x.toString()) },
                 { case email =>
-                    val res = AuthServer.connection(id)
-                    res.onSuccess{ case x => client ! Authenticated(None); context.become(authenticated) }
+                    val res = AuthServer.connection(app, id)
+                    res.onSuccess{ case x => client ! Authenticated(x); context.become(authenticated) }
                     res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
                 }
             )

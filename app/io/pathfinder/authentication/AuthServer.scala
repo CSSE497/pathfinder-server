@@ -48,37 +48,44 @@ object AuthServer {
         }
     }
 
-    def connection(appId: String, cId: String): Future[AuthenticationStatus] = for {
-        res <- WS.url(connection).withQueryString("connection_id" -> cId, "application_id" -> appId).get()
-    } yield {
+    def connection(appId: String, cId: String, dashboard: Boolean): Future[AuthenticationStatus] = {
         val app = Application.finder.byId(appId)
         if(app == null){
             throw new NoSuchElementException("No Application with id: " + appId)
         }
-        val verifier = if(app.key == null) {
+        val auth_url = if(null == app.auth_url) {
+            connection
+        } else {
+            app.auth_url
+        }
+        val verifier = if(connection == auth_url) {
             authServerVerifier
         } else {
             toVerifier(app.key)
         }
-        Logger.info(verifier.toString())
-        val token = SignedJWT.parse(new String(res.bodyAsBytes,"UTF-8"))
-        if(!token.verify(verifier)){
-            throw new IllegalArgumentException("Invalid Token, unable to verify signature")
+        for {
+            res <- WS.url(app.auth_url).withQueryString("connection_id" -> cId, "application_id" -> appId).get()
+        } yield {
+            Logger.info(verifier.toString())
+            val token = SignedJWT.parse(new String(res.bodyAsBytes,"UTF-8"))
+            if(!token.verify(verifier)){
+                throw new IllegalArgumentException("Invalid Token, unable to verify signature")
+            }
+            val claims = token.getJWTClaimsSet
+            if(claims.getExpirationTime.before(new Date())){
+                throw new IllegalArgumentException("expired token")
+            }
+            if(!claims.getAudience.contains(audience)){
+                throw new IllegalArgumentException(audience + " required in aud claim")
+            }
+            if(claims.getIssuer() != issuer){
+                throw new IllegalArgumentException(issuer + " required in iss claim")
+            }
+            val status = claims.getStringClaim("status")
+            if(status == null){
+                throw new IllegalArgumentException("status claim required")
+            }
+            AuthenticationStatus.withName(status)
         }
-        val claims = token.getJWTClaimsSet
-        if(claims.getExpirationTime.before(new Date())){
-            throw new IllegalArgumentException("expired token")
-        }
-        if(!claims.getAudience.contains(audience)){
-            throw new IllegalArgumentException(audience + " required in aud claim")
-        }
-        if(claims.getIssuer() != issuer){
-            throw new IllegalArgumentException(issuer + " required in iss claim")
-        }
-        val status = claims.getStringClaim("status")
-        if(status == null){
-            throw new IllegalArgumentException("status claim required")
-        }
-        AuthenticationStatus.withName(status)
     }
 }

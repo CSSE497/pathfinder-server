@@ -51,6 +51,9 @@ class Application extends Model {
     @Column
     var key: Array[Byte] = null
 
+    @Column
+    var auth_url: String = null
+
     def cluster: Cluster = {
         Cluster.finder.byId(id)
     }
