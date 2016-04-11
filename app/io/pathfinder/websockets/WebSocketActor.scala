@@ -47,16 +47,10 @@ class WebSocketActor (
     import WebSocketActor.{controllers, observers, authenticate}
 
     def receive: Receive = {
-        case Authenticate(opt) => opt.fold{client ! Error("No Email Provided")}{
-            x => x.validate(__.read[String]).fold(
-                { case invalid => client ! Error("invalid json: " + x.toString()) },
-                { case email =>
-                    val res = AuthServer.connection(app, id)
-                    res.onSuccess{ case x => client ! Authenticated(x); context.become(authenticated) }
-                    res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
-                }
-            )
-        }
+        case Authenticate(opt) =>
+            val res = AuthServer.connection(app, id, opt.getOrElse(false))
+            res.onSuccess{ case x => client ! Authenticated(x); context.become(authenticated) }
+            res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
         case m: WebSocketMessage => client ! Error("Not Authenticated")
     }
 

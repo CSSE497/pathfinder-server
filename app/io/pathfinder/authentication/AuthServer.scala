@@ -48,17 +48,17 @@ object AuthServer {
         }
     }
 
-    def connection(appId: String, cId: String, dashboard: Boolean): Future[AuthenticationStatus] = {
+    def connection(appId: String, cId: String, isDashboardLogin: Boolean): Future[AuthenticationStatus] = {
         val app = Application.finder.byId(appId)
         if(app == null){
             throw new NoSuchElementException("No Application with id: " + appId)
         }
-        val auth_url = if(null == app.auth_url) {
+        val auth_url = if(null == app.auth_url || isDashboardLogin) {
             connection
         } else {
             app.auth_url
         }
-        val verifier = if(connection == auth_url) {
+        val verifier = if(isDashboardLogin || connection == auth_url) {
             authServerVerifier
         } else {
             toVerifier(app.key)

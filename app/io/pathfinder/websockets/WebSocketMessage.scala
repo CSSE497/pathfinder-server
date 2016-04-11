@@ -486,7 +486,7 @@ object WebSocketMessage {
     addComp(ConnectionId)
 
     case class Authenticate(
-        value: Option[JsValue]
+        dashboard: Option[Boolean]
     ) extends WebSocketMessage {
         override type M = Authenticate
         override def companion = Authenticate
