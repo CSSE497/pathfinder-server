@@ -2,7 +2,7 @@
 [![Build Status](https://travis-ci.org/CSSE497/pathfinder-server.svg?branch=dev)](https://travis-ci.org/CSSE497/pathfinder-server)
 [![Coverage Status](https://coveralls.io/repos/CSSE497/pathfinder-server/badge.svg?branch=dev&service=github)](https://coveralls.io/github/CSSE497/pathfinder-server?branch=dev)
 
-This server exposes [https://api.thepathfinder.xyz](https://api.thepathfinder.xyz), the websocket API that powers the Pathfinder SDKs. Pathfinder users do not need to be familiar with this service as it is entirely wrapped by the [Pathfinder SDKs](https://pathfinder.readme.io/docs/platform-support).
+This server exposes `https://api.thepathfinder.xyz`, the websocket API that powers the Pathfinder SDKs. Pathfinder users do not need to be familiar with this service as it is entirely wrapped by the [Pathfinder SDKs](https://pathfinder.readme.io/docs/platform-support).
 
 
 ## Development Guide
@@ -45,31 +45,36 @@ The running Docker container can be updated with
 
 1. Increase the version number in `build.sbt` and tag the repository
 
-
-    vi build.sbt
-    git tag -a v0.1.1
-    git push --tag
+```
+vi build.sbt
+git tag -a v0.1.1
+git push --tag
+```
 
 2. Ensure that Docker is up and running
 
-
-    docker-machine start default
-    eval "$(docker-machine env default)"
+```
+docker-machine start default
+eval "$(docker-machine env default)"
+```
 
 3. Authenticate Docker to GCR
 
-
-    docker login -e <email> -u _token -p "$(gcloud auth print-access-token)" https://beta.gcr.io
+```
+docker login -e <email> -u _token -p "$(gcloud auth print-access-token)" https://beta.gcr.io
+```
 
 4. Build the image and push it to GCR (as defined in build.sbt)
 
-
-    activator docker:publish
+```
+activator docker:publish
+```
 
 5. Update the pods
 
-
-    kubectl rolling-update pathfinder-server --image=beta.gcr.io/<gcloud project id>/pathfinder-server:<version>
+```
+kubectl rolling-update pathfinder-server --image=beta.gcr.io/<gcloud project id>/pathfinder-server:<version>
+```
 
 ## License
 
