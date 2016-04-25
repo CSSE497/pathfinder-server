@@ -8,6 +8,7 @@ import play.api.libs.json.JsValue
 import scala.concurrent.{Future, Promise}
 import java.util.Base64
 import io.pathfinder.models.Application
+import io.pathfinder.authentication.AuthenticationStatus._
 import java.util.Date
 import play.Logger
 
@@ -25,7 +26,11 @@ object AuthServer {
     val certificate = Play.current.configuration.getString("AuthServer.certificate").get
     val audience = Play.current.configuration.getString("AuthServer.audience").get
     val issuer = Play.current.configuration.getString("AuthServer.issuer").get
-    private var verifier: RSASSAVerifier = null
+    private var authServerVerifier: RSASSAVerifier = null
+    private val kf = KeyFactory.getInstance("RSA")
+
+    private def toVerifier(bytes: Array[Byte]): RSASSAVerifier =
+        new RSASSAVerifier(kf.generatePublic(new X509EncodedKeySpec(bytes)).asInstanceOf[RSAPublicKey])
 
     for {
         response <- WS.url(certificate).get()
@@ -35,10 +40,7 @@ object AuthServer {
             Logger.info(response.body)
             val pub = new String(response.bodyAsBytes, "UTF-8").replaceAll("-----BEGIN PUBLIC KEY-----\n|-----END PUBLIC KEY-----|\n", "");
             val decoded = Base64.getDecoder.decode(pub)
-            val spec = new X509EncodedKeySpec(decoded)
-            val kf = KeyFactory.getInstance("RSA")
-            val publicKey = kf.generatePublic(spec).asInstanceOf[RSAPublicKey]
-            verifier = new RSASSAVerifier(publicKey)
+            authServerVerifier = toVerifier(decoded)
         } catch {
             case e: Throwable =>
                 Logger.error("Failed to load auth server key", e)
@@ -46,23 +48,44 @@ object AuthServer {
         }
     }
 
-    def connection(id: String): Future[Unit] = for {
-        res <- WS.url(connection).withQueryString("connection_id" -> id).get()
-    } yield {
-        Logger.info(verifier.toString())
-        val token = SignedJWT.parse(new String(res.bodyAsBytes,"UTF-8"))
-        if(!token.verify(verifier)){
-            throw new IllegalArgumentException("Invalid Token")
+    def connection(appId: String, cId: String, isDashboardLogin: Boolean): Future[AuthenticationStatus] = {
+        val app = Application.finder.byId(appId)
+        if(app == null){
+            throw new NoSuchElementException("No Application with id: " + appId)
         }
-        val claims = token.getJWTClaimsSet
-        if(claims.getExpirationTime.before(new Date())){
-            throw new IllegalArgumentException("expired token")
+        val auth_url = if(null == app.auth_url || isDashboardLogin) {
+            connection
+        } else {
+            app.auth_url
         }
-        if(!claims.getAudience.contains(audience)){
-            throw new IllegalArgumentException(audience + " required in aud claim")
+        val verifier = if(isDashboardLogin || connection == auth_url) {
+            authServerVerifier
+        } else {
+            toVerifier(app.key)
         }
-        if(claims.getIssuer() != issuer){
-            throw new IllegalArgumentException(issuer + " required in iss claim")
+        for {
+            res <- WS.url(app.auth_url).withQueryString("connection_id" -> cId, "application_id" -> appId).get()
+        } yield {
+            Logger.info(verifier.toString())
+            val token = SignedJWT.parse(new String(res.bodyAsBytes,"UTF-8"))
+            if(!token.verify(verifier)){
+                throw new IllegalArgumentException("Invalid Token, unable to verify signature")
+            }
+            val claims = token.getJWTClaimsSet
+            if(claims.getExpirationTime.before(new Date())){
+                throw new IllegalArgumentException("expired token")
+            }
+            if(!claims.getAudience.contains(audience)){
+                throw new IllegalArgumentException(audience + " required in aud claim")
+            }
+            if(claims.getIssuer() != issuer){
+                throw new IllegalArgumentException(issuer + " required in iss claim")
+            }
+            val status = claims.getStringClaim("status")
+            if(status == null){
+                throw new IllegalArgumentException("status claim required")
+            }
+            AuthenticationStatus.withName(status)
         }
     }
 }

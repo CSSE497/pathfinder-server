@@ -16,9 +16,10 @@ import io.pathfinder.authentication.AuthServer
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.libs.functional.syntax._
+import io.pathfinder.authentication.AuthenticationStatus
 
 object WebSocketActor {
-    private val authenticate = Play.current.configuration.getBoolean("authenticate").getOrElse(false)
+    private val authenticate = Play.current.configuration.getBoolean("Authenticate").getOrElse(false)
 
     val controllers: Map[ModelType, WebSocketController] = Map(
         ModelTypes.Transport -> VehicleSocketController,
@@ -46,16 +47,10 @@ class WebSocketActor (
     import WebSocketActor.{controllers, observers, authenticate}
 
     def receive: Receive = {
-        case Authenticate(opt) => opt.fold{client ! Error("No Email Provided")}{
-            x => x.validate(__.read[String]).fold(
-                { case invalid => client ! Error("invalid json: " + x.toString()) },
-                { case email =>
-                    val res = AuthServer.connection(id)
-                    res.onSuccess{ case x => client ! Authenticated(None); context.become(authenticated) }
-                    res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
-                }
-            )
-        }
+        case Authenticate(opt) =>
+            val res = AuthServer.connection(app, id, opt.getOrElse(false))
+            res.onSuccess{ case x => client ! Authenticated(x); context.become(authenticated) }
+            res.onFailure{ case e => Logger.error("Error from connection request", e); client ! Error(e.getMessage) }
         case m: WebSocketMessage => client ! Error("Not Authenticated")
     }
 
@@ -63,7 +58,8 @@ class WebSocketActor (
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
             m.withApp(app).getOrElse{
-                Error("Unable to parse cluster id")
+                Logger.info("Could not find app id " + app)
+                client ! Error("Unable to parse cluster id")
             } match {
                 case Route(id) =>
                     if(!Router.routeRequest(client, id)) {

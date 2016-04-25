@@ -2,6 +2,7 @@ package io.pathfinder.websockets
 
 import io.pathfinder.models.{Commodity, Cluster, ModelId}
 import io.pathfinder.websockets.WebSocketMessage.MessageCompanion
+import io.pathfinder.authentication.AuthenticationStatus._
 import play.Logger
 import play.api.libs.json.{JsSuccess, JsResult, Format, Json, JsValue, __}
 import play.api.mvc.WebSocket.FrameFormatter
@@ -485,7 +486,7 @@ object WebSocketMessage {
     addComp(ConnectionId)
 
     case class Authenticate(
-        value: Option[JsValue]
+        dashboard: Option[Boolean]
     ) extends WebSocketMessage {
         override type M = Authenticate
         override def companion = Authenticate
@@ -497,7 +498,7 @@ object WebSocketMessage {
     }
     addComp(Authenticate)
 
-    case class Authenticated(id: Option[String]) extends WebSocketMessage {
+    case class Authenticated(status: AuthenticationStatus) extends WebSocketMessage {
         override type M = Authenticated
         override def companion = Authenticated
     }
