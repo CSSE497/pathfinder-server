@@ -19,7 +19,7 @@ import play.api.libs.functional.syntax._
 import io.pathfinder.authentication.AuthenticationStatus
 
 object WebSocketActor {
-    private val authenticate = Play.current.configuration.getBoolean("authenticate").getOrElse(false)
+    private val authenticate = Play.current.configuration.getBoolean("Authenticate").getOrElse(false)
 
     val controllers: Map[ModelType, WebSocketController] = Map(
         ModelTypes.Transport -> VehicleSocketController,
@@ -58,7 +58,8 @@ class WebSocketActor (
         case m: WebSocketMessage => Try{
             Logger.info("Received Socket Message " + m)
             m.withApp(app).getOrElse{
-                Error("Unable to parse cluster id")
+                Logger.info("Could not find app id " + app)
+                client ! Error("Unable to parse cluster id")
             } match {
                 case Route(id) =>
                     if(!Router.routeRequest(client, id)) {
