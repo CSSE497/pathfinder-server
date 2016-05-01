@@ -36,8 +36,7 @@ object ClusterRouter {
     val routingServer = WS.url(Play.current.configuration.getString("routing.server").getOrElse(
         throw new scala.Error("routing.server not defined in application.conf, routing will not work")
     )).withHeaders(
-        "Content-Type" -> "application/json",
-        "Accept" -> "application/json"
+        "Content-Type" -> "application/json"
     )
 
     def props(cluster: Cluster): Props = Props(new ClusterRouter(cluster.id))
@@ -111,18 +110,17 @@ object ClusterRouter {
     abstract sealed class CacheState {
         def asFuture: Future[ClusterRoute]
         def events: Seq[ClusterEvent]
-        def version: Int // each cache state has a version number which indicate which route is being held or requested
     }
 
     object CacheState {
 
         // a route calculation is in progress
-        case class Updating(routes: Future[ClusterRoute], events: Seq[ClusterEvent], version: Int) extends CacheState {
+        case class Updating(routes: Future[ClusterRoute], events: Seq[ClusterEvent]) extends CacheState {
             override def asFuture: Future[ClusterRoute] = routes
         }
 
         // an up to date route is available
-        case class UpToDate(routes: ClusterRoute, version: Int) extends CacheState {
+        case class UpToDate(routes: ClusterRoute) extends CacheState {
             override def asFuture: Future[ClusterRoute] = {
                 Logger.info("Using cached routes")
                 Future.successful(routes)
@@ -136,10 +134,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     import ClusterRouter._
 
     @volatile
-    private var cachedRoutes: CacheState = handleUpdating(Updating(recalculate(), Seq.empty, 0))
-
-    @volatile
-    private var publishedVersion: Int = -1 // is only set within synchronized blocks, so we don't need to use AtomicInteger
+    private var cachedRoutes: CacheState = handleUpdating(Updating(recalculate(), Seq.empty))
 
     override type Event = (ModelId, Routed)
     override type Classifier = ModelId // subscribe by model and by id
@@ -166,25 +161,21 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         None
     )
 
-    def publish(cr: ClusterRoute, version: Int): Unit = {
-        Logger.info("Published Version check: " + version + " > " + publishedVersion)
-        if(version > publishedVersion) { // don't send outdated routes
-            publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
-            cr.routes.foreach { route =>
-                val routeJson: JsValue = Route.writes.writes(route)
-                val vehicleJson: JsValue = Transport.format.writes(route.transport)
+    def publish(cr: ClusterRoute): Unit = {
+		publish((ModelId.ClusterPath(clusterPath), cr.routed)) // send list of routes to cluster subscribers
+		cr.routes.foreach { route =>
+			val routeJson: JsValue = Route.writes.writes(route)
+			val vehicleJson: JsValue = Transport.format.writes(route.transport)
 
-                // publish vehicles to vehicle subscribers
-                publish((ModelId.TransportId(route.transport.id), Routed(ModelTypes.Transport, vehicleJson, routeJson, None)))
-                route.actions.tail.collect {
-                    case PickUp(lat, lng, com) =>
-                        val comJson = Commodity.format.writes(com) // publish commodities to commodity subscribers
-                        publish((ModelId.CommodityId(com.id), Routed(ModelTypes.Commodity, comJson, routeJson, None)))
-                    case _Else => Unit
-                }
-            }
-            publishedVersion = version
-        }
+			// publish vehicles to vehicle subscribers
+			publish((ModelId.TransportId(route.transport.id), Routed(ModelTypes.Transport, vehicleJson, routeJson, None)))
+			route.actions.tail.collect {
+				case PickUp(lat, lng, com) =>
+					val comJson = Commodity.format.writes(com) // publish commodities to commodity subscribers
+					publish((ModelId.CommodityId(com.id), Routed(ModelTypes.Commodity, comJson, routeJson, None)))
+				case _Else => Unit
+			}
+		}
     }
 
     private def addErrorHandling[E](f: Future[E]): Future[E] = {
@@ -246,25 +237,22 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
         )
 
     private def handleUpdating(u: Updating): Updating = {
-        handleUpdating(u.routes, u.version)
+        handleUpdating(u.routes)
         u
     }
 
-    private def handleUpdating(futureRoutes: Future[ClusterRoute], version: Int): Unit = {
+    private def handleUpdating(futureRoutes: Future[ClusterRoute]): Unit = {
         futureRoutes.onComplete { routeTry =>
             routeTry.map { cr =>
                 synchronized {
-                    Logger.info("Update received: " + cachedRoutes.version + " == " + version)
-                    if(cachedRoutes.version == version) {
                         handleEvents(cachedRoutes.events, cr) match {
                             case (ncr, true) =>
-                                cachedRoutes = CacheState.UpToDate(ncr, version)
-                                publish(ncr, version)
+                                cachedRoutes = CacheState.UpToDate(ncr)
+                                publish(ncr)
                             case (ncr, false) =>
-                                cachedRoutes = handleUpdating(Updating(recalculate(), Seq.empty, version+1))
-                                publish(ncr, version)
+                                cachedRoutes = handleUpdating(Updating(recalculate(), Seq.empty))
+                                publish(ncr)
                         }
-                    } else publish(cr, version)
                 }
             }
         }
@@ -278,20 +266,19 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             synchronized {
                 Logger.info("ClusterRouter received recalculate request")
                 cachedRoutes match {
-                    case UpToDate(routes, version) =>
-                        val updating = handleUpdating(Updating(recalculate(), Seq.empty, version + 1))
+                    case UpToDate(routes) =>
+                        val updating = handleUpdating(Updating(recalculate(), Seq.empty))
                         updating.routes.onSuccess{
                             case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
                         }
                         updating.routes.onFailure{
                             case e => client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
                         }
-                    case Updating(future, events, version) => // we ignore the events since we are updating everything
+                    case Updating(future, events) => // we ignore the events since we are updating everything
                         val next = after(future).flatMap(x => recalculate())
                         cachedRoutes = handleUpdating(Updating(
                             next,
-                            Seq.empty,
-                            version + 1
+                            Seq.empty
                         ))
                         next.onSuccess{
                             case x => client ! Recalculated(Cluster.removeAppFromPath(clusterPath))
@@ -311,12 +298,12 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                     Logger.info("Received event :" + e)
                     Logger.info("Cached Routes: " + cachedRoutes)
                     cachedRoutes match {
-                        case UpToDate(cr, v) =>
+                        case UpToDate(cr) =>
                             cachedRoutes = handleEvent(e, cr).map { ncr =>
-                                publish(ncr, v + 1)
-                                UpToDate(ncr, v + 1)
+                                publish(ncr)
+                                UpToDate(ncr)
                             }.getOrElse {
-                                handleUpdating(Updating(recalculate(), Seq.empty, v + 1))
+                                handleUpdating(Updating(recalculate(), Seq.empty))
                             }
                         case u: Updating => cachedRoutes = u.copy(events = u.events :+ e)
                     }
@@ -492,7 +479,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             Logger.info("Objective Function : "+fun.id+" : "+fun.function)
             JsObject(Seq(
                 "commodities" -> comTable,
-                "vehicles" -> vehicleTable,
+                "transports" -> vehicleTable,
                 "capacities" -> capacities,
                 "distances" -> makeMatrix(
                     startToPickUpDist,
@@ -523,7 +510,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
             routingServer.post(
                 json
             ).map{ response =>
-               Logger.info("Received routing response: "+response.json)
+               Logger.info("Received routing response: "+response.body)
                response
             }.recoverWith[WSResponse]{
                 case t =>
