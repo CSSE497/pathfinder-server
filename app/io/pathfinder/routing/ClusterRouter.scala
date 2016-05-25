@@ -181,8 +181,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
     private def addErrorHandling[E](f: Future[E]): Future[E] = {
         f.onFailure{
             case e: Throwable =>
-                Logger.warn("Error updating routes for cluster: " + clusterPath)
-                Logger.trace(e.getMessage, e.getStackTrace)
+                Logger.error("Error updating routes for cluster: " + clusterPath, e)
         }
         f
     }
@@ -275,7 +274,7 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                             case e => client ! WebSocketMessage.Error("Failed to recalculate route: " + e.getMessage)
                         }
                     case Updating(future, events) => // we ignore the events since we are updating everything
-                        val next = after(future).flatMap(x => recalculate())
+                        val next = after(future).flatMap(x => recalculate()).recoverWith{case x => recalculate()}
                         cachedRoutes = handleUpdating(Updating(
                             next,
                             Seq.empty
@@ -351,13 +350,16 @@ class ClusterRouter(clusterPath: String) extends EventBusActor with ActorEventBu
                 Reads.seq(Reads.seq(Reads.JsNumberReads.map(_.value.toInt))).map(routes =>
                     routes.map { arr =>
                         val routeBuilder = Route.newBuilder(vehicles(arr.head - 1 - 2 * commodities.size))
-                        arr.tail.foreach( i =>
-                            if (i <= commodities.size) {
-                                routeBuilder += new PickUp(commodities(i - 1))
-                            } else {
-                                routeBuilder += new DropOff(commodities(i - commodities.size - 1))
+                        if(arr.length > 1){
+                            arr.tail.foreach{ i =>
+                                Logger.info("COM SIZE: " + commodities.size)
+                                if (i <= commodities.size) {
+                                    routeBuilder += new PickUp(commodities(i - 1))
+                                } else {
+                                    routeBuilder += new DropOff(commodities(i - commodities.size - 1))
+                                }
                             }
-                        )
+                        }
                         routeBuilder.result()
                     }
                 )
